@@ -1,4 +1,21 @@
 tls:
+  # 1. Yerel Ağ (*.icat.intra) İçin UCS Tarafından İmzalanan Sertifika
   certificates:
-    - certFile: /certs/cert.crt
-      keyFile: /certs/cert.key
+    - certFile: /certs/ucs-cert.crt
+      keyFile: /certs/ucs-cert.key
+      stores:
+        - default
+
+  # 2. Varsayılan TLS Yapılandırması
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: false
+
+# Traefik'in iç servislerle (OPNsense, UCS LDAPS vb.) konuşurken UCS Kök Sertifikasını tanıması için:
+http:
+  serversTransports:
+    ucsInternalTransport:
+      rootCAs:
+        - /certs/ucs-root-ca.crt
+      insecureSkipVerify: false
