@@ -128,3 +128,25 @@ echo -e "\n${GREEN}==============================================${NC}"
 echo -e "${GREEN}    TÜM ŞİFRELER VE .env DOĞRULANDI           ${NC}"
 echo -e "${GREEN}==============================================${NC}"
 echo -e "Yığını başlatmak için: ${YELLOW}docker compose up -d${NC}\n"
+
+
+# -------------------------------------------------------------
+# TLS & ACME.JSON DOSYA YETKİ KONTROLÜ
+# -------------------------------------------------------------
+CERTS_DIR="traefik/certs"
+ACME_FILE="${CERTS_DIR}/acme.json"
+
+mkdir -p "$CERTS_DIR"
+
+if [ ! -f "$ACME_FILE" ]; then
+    touch "$ACME_FILE"
+    chmod 600 "$ACME_FILE"
+    echo -e "${GREEN}[✓] traefik/certs/acme.json oluşturuldu ve 600 izni verildi.${NC}"
+else
+    chmod 600 "$ACME_FILE"
+fi
+
+if [ ! -f "${CERTS_DIR}/ucs-root-ca.crt" ]; then
+    echo -e "${YELLOW}[!] UYARI: ${CERTS_DIR}/ucs-root-ca.crt bulunamadı!${NC}"
+    echo -e "    UCS sunucunuzdan kök sertifikayı bu konuma kopyalamayı unutmayın."
+fi
