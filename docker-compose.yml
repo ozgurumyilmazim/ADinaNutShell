@@ -1,6 +1,6 @@
 services:
   # ==========================================
-  # 1. REVERSE PROXY & INGRESS: TRAEFIK
+  # 1. INGRESS & REVERSE PROXY: TRAEFIK
   # ==========================================
   traefik:
     image: traefik:v3.1
@@ -16,24 +16,33 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      # CrowdSec için erişim logları
       - "--accesslog=true"
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--accesslog.bufferingsize=100"
+      # Let's Encrypt Cloudflare DNS Challenge
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/certs/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+      # TXT kaydının yayılmasını doğrulamak için genel DNS resolver tanımları:
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
+    environment:
+      # Cloudflare DNS API Token (Lego kütüphanesi bu değişkeni okur)
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
-      - ./traefik/certs:/certs:ro
+      - ./traefik/certs:/certs:rw
       - traefik_logs:/var/log/traefik
     networks:
       - edge_network
-      
+
 
   # ==========================================
-  # 2. MERKEZİ VERİTABANI: POSTGRESQL (ZITADEL, GUACAMOLE, VAULTWARDEN)
+  # 2. VERİTABANI: POSTGRESQL (ZITADEL, GUAC, VAULT)
   # ==========================================
   zitadel-db:
     image: postgres:16-alpine
@@ -42,9 +51,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB} # Varsayılan DB (Zitadel)
-      
-      # Init Script İçin Parametreler
+      POSTGRES_DB: ${POSTGRES_DB}
       GUACAMOLE_DB_USER: ${GUACAMOLE_DB_USER}
       GUACAMOLE_DB_PASSWORD: ${GUACAMOLE_DB_PASSWORD}
       GUACAMOLE_DB_NAME: ${GUACAMOLE_DB_NAME}
@@ -54,7 +61,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - postgres_backup:/backups
-      - ./postgres-init:/docker-entrypoint-initdb.d:ro # Başlangıç betikleri dizini
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
@@ -64,7 +71,7 @@ services:
       - internal_network
 
   # ==========================================
-  # 3. IAM & SSO: ZITADEL
+  # 3. IDENTITY PROVIDER & SSO: ZITADEL
   # ==========================================
   zitadel:
     image: ghcr.io/zitadel/zitadel:latest
@@ -114,7 +121,7 @@ services:
       - portainer_data:/data
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(`portainer.${DOMAIN_INT}`)"
+      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_EXT}`)"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.routers.portainer.tls=true"
       - "traefik.http.routers.portainer.service=portainer-svc"
@@ -123,7 +130,7 @@ services:
       - edge_network
 
   # ==========================================
-  # 5. GÜVENLİK / IPS: CROWDSEC
+  # 5. INTRUSION PREVENTION: CROWDSEC
   # ==========================================
   crowdsec:
     image: crowdsecurity/crowdsec:latest
@@ -134,7 +141,7 @@ services:
     volumes:
       - crowdsec_config:/etc/crowdsec
       - crowdsec_data:/var/lib/crowdsec/data
-      - traefik_logs:/var/log/traefik:ro # Traefik loglarını okuyup saldırganları banlar
+      - traefik_logs:/var/log/traefik:ro
     networks:
       - edge_network
 
@@ -147,14 +154,14 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.${DOMAIN_INT}`)"
+      - "traefik.http.routers.whoami.rule=Host(`${WHOAMI_EXT}`)"
       - "traefik.http.routers.whoami.entrypoints=websecure"
       - "traefik.http.routers.whoami.tls=true"
     networks:
       - edge_network
 
   # ==========================================
-  # 7. GÜVENLİ MESH VPN: TAILSCALE
+  # 7. MESH VPN: TAILSCALE
   # ==========================================
   tailscale:
     image: tailscale/tailscale:latest
@@ -165,7 +172,7 @@ services:
       - TS_AUTHKEY=${TAILSCALE_AUTH_KEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
-      - TS_ROUTES=${TAILSCALE_ADVERTISED_ROUTES} # Örn: 172.16.1.0/24 (Dahili ağ erişimi için)
+      - TS_ROUTES=${TAILSCALE_ADVERTISED_ROUTES}
     volumes:
       - tailscale_data:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
@@ -176,7 +183,7 @@ services:
       - edge_network
 
   # ==========================================
-  # 8. SIFIR-PORT HARİCİ TÜNEL: CLOUDFLARE TUNNEL
+  # 8. SIFIR-PORT HARİCİ TÜNEL: CLOUDFLARE
   # ==========================================
   cloudflare:
     image: cloudflare/cloudflared:latest
@@ -185,19 +192,19 @@ services:
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     networks:
       - edge_network
-      
-# ==========================================
-  # 9. UZAK MASAÜSTÜ DAEMON: GUACD
+
+  # ==========================================
+  # 9. GUACAMOLE DAEMON: GUACD
   # ==========================================
   guacd:
     image: guacamole/guacd:latest
     container_name: guacd
     restart: unless-stopped
     networks:
-      - internal_network # Yalnızca dahili ağda çalışır, dışarı port açmaz
+      - internal_network
 
   # ==========================================
-  # 10. CLIENT / WEB ARAYÜZÜ: GUACAMOLE
+  # 10. GUACAMOLE WEB CLIENT
   # ==========================================
   guacamole:
     image: guacamole/guacamole:latest
@@ -209,21 +216,17 @@ services:
     environment:
       GUACD_HOSTNAME: guacd
       GUACD_PORT: 4822
-      # Guacamole'nin /guacamole/ yerine doğrudan kök dizinde (/) çalışması için:
       WEBAPP_CONTEXT: ROOT
-
-      # PostgreSQL Bağlantısı
       POSTGRESQL_HOSTNAME: zitadel-db
       POSTGRESQL_PORT: 5432
-      POSTGRESQL_DATABASE: guacamole_db
-      POSTGRESQL_USER: ${GUACAMOLE_DB_USER:-guacamole}
+      POSTGRESQL_DATABASE: ${GUACAMOLE_DB_NAME}
+      POSTGRESQL_USER: ${GUACAMOLE_DB_USER}
       POSTGRESQL_PASSWORD: ${GUACAMOLE_DB_PASSWORD}
-
     volumes:
       - guacamole_home:/home/guacamole/.guacamole
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.guacamole.rule=Host(`guacamole.${DOMAIN_INT}`)"
+      - "traefik.http.routers.guacamole.rule=Host(`${GUACAMOLE_EXT}`)"
       - "traefik.http.routers.guacamole.entrypoints=websecure"
       - "traefik.http.routers.guacamole.tls=true"
       - "traefik.http.routers.guacamole.service=guacamole-svc"
@@ -232,8 +235,8 @@ services:
       - edge_network
       - internal_network
 
-# ==========================================
-  # 11. PAROLA YÖNETİCİSİ: VAULTWARDEN (POSTGRESQL TABANLI)
+  # ==========================================
+  # 11. PAROLA YÖNETİCİSİ: VAULTWARDEN
   # ==========================================
   vaultwarden:
     image: vaultwarden/server:latest
@@ -248,10 +251,9 @@ services:
       - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
       - INVITATIONS_ALLOWED=true
       - WEBSOCKET_ENABLED=true
-      # PostgreSQL Bağlantı Dizesi (URL Formatında)
       - DATABASE_URL=postgresql://${VAULTWARDEN_DB_USER}:${VAULTWARDEN_DB_PASSWORD}@zitadel-db:5432/${VAULTWARDEN_DB_NAME}
     volumes:
-      - vaultwarden_data:/data # Ekler ve ayarlar (PostgreSQL dışında kalanlar) için gereklidir
+      - vaultwarden_data:/data
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.vaultwarden.rule=Host(`${VAULTWARDEN_FQDN}`)"
@@ -261,8 +263,7 @@ services:
       - "traefik.http.services.vaultwarden-svc.loadbalancer.server.port=80"
     networks:
       - edge_network
-      - internal_network # Veritabanına erişim için dahili ağa bağlanmalıdır
-      
+      - internal_network
 # ==========================================
 # AĞ VE HACİM (NETWORK & VOLUME) TANIMLARI
 # ==========================================
