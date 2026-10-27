@@ -1,0 +1,23 @@
+# Çevre değişkenleri ve gizli anahtarlar
+.env
+.env.local
+*.env
+
+# Veritabanı ve yerel konteyner verileri
+data/
+postgres_data/
+
+# SSL / TLS Sertifikaları ve Özel Anahtarlar
+traefik/certs/*
+!traefik/certs/.gitkeep
+*.pem
+*.crt
+*.key
+
+# Sistem ve Editör Dosyaları
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.log
