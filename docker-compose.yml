@@ -1,0 +1,284 @@
+services:
+  # ==========================================
+  # 1. INGRESS & REVERSE PROXY: TRAEFIK
+  # ==========================================
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--accesslog.bufferingsize=100"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./traefik/certs:/certs:ro
+      - traefik_logs:/var/log/traefik
+    networks:
+      - edge_network
+
+  # ==========================================
+  # 2. VERİTABANI: POSTGRESQL (ZITADEL, GUAC, VAULT)
+  # ==========================================
+  zitadel-db:
+    image: postgres:16-alpine
+    container_name: zitadel-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      GUACAMOLE_DB_USER: ${GUACAMOLE_DB_USER}
+      GUACAMOLE_DB_PASSWORD: ${GUACAMOLE_DB_PASSWORD}
+      GUACAMOLE_DB_NAME: ${GUACAMOLE_DB_NAME}
+      VAULTWARDEN_DB_USER: ${VAULTWARDEN_DB_USER}
+      VAULTWARDEN_DB_PASSWORD: ${VAULTWARDEN_DB_PASSWORD}
+      VAULTWARDEN_DB_NAME: ${VAULTWARDEN_DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backup:/backups
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal_network
+
+  # ==========================================
+  # 3. IDENTITY PROVIDER & SSO: ZITADEL
+  # ==========================================
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:latest
+    container_name: zitadel
+    restart: unless-stopped
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    command: 'start-from-init --masterkey "${ZITADEL_MASTERKEY}"'
+    environment:
+      ZITADEL_DATABASE_POSTGRES_HOST: zitadel-db
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: ${POSTGRES_DB}
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: ${POSTGRES_USER}
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${POSTGRES_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: ${POSTGRES_USER}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_FQDN}
+      ZITADEL_EXTERNALPORT: 443
+      ZITADEL_EXTERNALSECURE: "true"
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ZITADEL_ORG_NAME}
+      ZITADEL_FIRSTINSTANCE_USER_USERNAME: ${ZITADEL_ADMIN_USER}
+      ZITADEL_FIRSTINSTANCE_USER_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.zitadel.rule=Host(`${ZITADEL_FQDN}`)"
+      - "traefik.http.routers.zitadel.entrypoints=websecure"
+      - "traefik.http.routers.zitadel.tls=true"
+      - "traefik.http.routers.zitadel.service=zitadel-svc"
+      - "traefik.http.services.zitadel-svc.loadbalancer.server.port=8080"
+      - "traefik.http.services.zitadel-svc.loadbalancer.server.scheme=h2c"
+    networks:
+      - edge_network
+      - internal_network
+
+  # ==========================================
+  # 4. CONTAINER YÖNETİMİ: PORTAINER CE
+  # ==========================================
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_FQDN}`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.tls=true"
+      - "traefik.http.routers.portainer.service=portainer-svc"
+      - "traefik.http.services.portainer-svc.loadbalancer.server.port=9000"
+    networks:
+      - edge_network
+
+  # ==========================================
+  # 5. INTRUSION PREVENTION: CROWDSEC
+  # ==========================================
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec
+    restart: unless-stopped
+    environment:
+      COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelist-good-actors"
+    volumes:
+      - crowdsec_config:/etc/crowdsec
+      - crowdsec_data:/var/lib/crowdsec/data
+      - traefik_logs:/var/log/traefik:ro
+    networks:
+      - edge_network
+
+  # ==========================================
+  # 6. ROUTING TEST SERVİSİ: WHOAMI
+  # ==========================================
+  whoami:
+    image: traefik/whoami:latest
+    container_name: whoami
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`${WHOAMI_FQDN}`)"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls=true"
+    networks:
+      - edge_network
+
+  # ==========================================
+  # 7. MESH VPN: TAILSCALE
+  # ==========================================
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    restart: unless-stopped
+    hostname: identity-gateway
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTH_KEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_ROUTES=${TAILSCALE_ADVERTISED_ROUTES}
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      - edge_network
+
+  # ==========================================
+  # 8. SIFIR-PORT HARİCİ TÜNEL: CLOUDFLARE
+  # ==========================================
+  cloudflare:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflare-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - edge_network
+
+  # ==========================================
+  # 9. GUACAMOLE DAEMON: GUACD
+  # ==========================================
+  guacd:
+    image: guacamole/guacd:latest
+    container_name: guacd
+    restart: unless-stopped
+    networks:
+      - internal_network
+
+  # ==========================================
+  # 10. GUACAMOLE WEB CLIENT
+  # ==========================================
+  guacamole:
+    image: guacamole/guacamole:latest
+    container_name: guacamole
+    restart: unless-stopped
+    depends_on:
+      - guacd
+      - zitadel-db
+    environment:
+      GUACD_HOSTNAME: guacd
+      GUACD_PORT: 4822
+      WEBAPP_CONTEXT: ROOT
+      POSTGRESQL_HOSTNAME: zitadel-db
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_DATABASE: ${GUACAMOLE_DB_NAME}
+      POSTGRESQL_USER: ${GUACAMOLE_DB_USER}
+      POSTGRESQL_PASSWORD: ${GUACAMOLE_DB_PASSWORD}
+    volumes:
+      - guacamole_home:/home/guacamole/.guacamole
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.guacamole.rule=Host(`${GUACAMOLE_FQDN}`)"
+      - "traefik.http.routers.guacamole.entrypoints=websecure"
+      - "traefik.http.routers.guacamole.tls=true"
+      - "traefik.http.routers.guacamole.service=guacamole-svc"
+      - "traefik.http.services.guacamole-svc.loadbalancer.server.port=8080"
+    networks:
+      - edge_network
+      - internal_network
+
+  # ==========================================
+  # 11. PAROLA YÖNETİCİSİ: VAULTWARDEN
+  # ==========================================
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    depends_on:
+      zitadel-db:
+        condition: service_healthy
+    environment:
+      - DOMAIN=https://${VAULTWARDEN_FQDN}
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
+      - INVITATIONS_ALLOWED=true
+      - WEBSOCKET_ENABLED=true
+      - DATABASE_URL=postgresql://${VAULTWARDEN_DB_USER}:${VAULTWARDEN_DB_PASSWORD}@zitadel-db:5432/${VAULTWARDEN_DB_NAME}
+    volumes:
+      - vaultwarden_data:/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vaultwarden.rule=Host(`${VAULTWARDEN_FQDN}`)"
+      - "traefik.http.routers.vaultwarden.entrypoints=websecure"
+      - "traefik.http.routers.vaultwarden.tls=true"
+      - "traefik.http.routers.vaultwarden.service=vaultwarden-svc"
+      - "traefik.http.services.vaultwarden-svc.loadbalancer.server.port=80"
+    networks:
+      - edge_network
+      - internal_network
+
+networks:
+  edge_network:
+    name: edge_network
+    driver: bridge
+  internal_network:
+    name: internal_network
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_data:
+    name: postgres_data
+  postgres_backup:
+    name: postgres_backup
+  portainer_data:
+    name: portainer_data
+  crowdsec_config:
+    name: crowdsec_config
+  crowdsec_data:
+    name: crowdsec_data
+  tailscale_data:
+    name: tailscale_data
+  traefik_logs:
+    name: traefik_logs
+  guacamole_home:
+    name: guacamole_home
+  vaultwarden_data:
+    name: vaultwarden_data
