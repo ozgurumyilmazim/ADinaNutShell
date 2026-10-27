@@ -1,0 +1,20 @@
+http:
+  routers:
+    opnsense-router:
+      rule: "Host(`opnsense.icat.intra`)"
+      entryPoints:
+        - "websecure"
+      service: "opnsense-service"
+      tls: {}
+
+  services:
+    opnsense-service:
+      loadBalancer:
+        serversTransport: "opnsenseTransport"
+        servers:
+          - url: "https://172.16.1.1:443"
+        passHostHeader: true
+
+  serversTransports:
+    opnsenseTransport:
+      insecureSkipVerify: true
