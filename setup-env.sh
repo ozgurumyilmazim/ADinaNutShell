@@ -121,19 +121,28 @@ manage_secret "CROWDSEC_DB_PASSWORD" "CrowdSec PostgreSQL Şifresi" 24 \
 # -------------------------------------------------------------
 # PGADMIN OTOMATIK SUNUCU TANIMLARI (servers.json)
 # -------------------------------------------------------------
-mkdir -p pgadmin
+mkdir -p crowdsec pgadmin
 
+# Değişkenleri oku
 PG_USER=$(get_env_val "POSTGRES_USER")
+PG_PASS=$(get_env_val "POSTGRES_PASSWORD")
 PG_DB=$(get_env_val "POSTGRES_DB")
+
 GUAC_USER=$(get_env_val "GUACAMOLE_DB_USER")
+GUAC_PASS=$(get_env_val "GUACAMOLE_DB_PASSWORD")
 GUAC_DB=$(get_env_val "GUACAMOLE_DB_NAME")
+
 VAULT_USER=$(get_env_val "VAULTWARDEN_DB_USER")
+VAULT_PASS=$(get_env_val "VAULTWARDEN_DB_PASSWORD")
 VAULT_DB=$(get_env_val "VAULTWARDEN_DB_NAME")
+
 CROWDSEC_USER=$(get_env_val "CROWDSEC_DB_USER")
 CROWDSEC_USER=${CROWDSEC_USER:-crowdsec}
+CROWDSEC_PASS=$(get_env_val "CROWDSEC_DB_PASSWORD")
 CROWDSEC_DB=$(get_env_val "CROWDSEC_DB_NAME")
 CROWDSEC_DB=${CROWDSEC_DB:-crowdsec_db}
 
+# pgAdmin servers.json dosyası
 cat <<EOF > pgadmin/servers.json
 {
   "Servers": {
@@ -144,7 +153,8 @@ cat <<EOF > pgadmin/servers.json
       "Username": "${PG_USER}",
       "Host": "db",
       "SSLMode": "prefer",
-      "MaintenanceDB": "${PG_DB}"
+      "MaintenanceDB": "${PG_DB}",
+      "PassFile": "/pgadmin4/pgpass"
     },
     "2": {
       "Name": "Guacamole Veritabani",
@@ -153,7 +163,8 @@ cat <<EOF > pgadmin/servers.json
       "Username": "${GUAC_USER}",
       "Host": "db",
       "SSLMode": "prefer",
-      "MaintenanceDB": "${GUAC_DB}"
+      "MaintenanceDB": "${GUAC_DB}",
+      "PassFile": "/pgadmin4/pgpass"
     },
     "3": {
       "Name": "Vaultwarden Veritabani",
@@ -162,7 +173,8 @@ cat <<EOF > pgadmin/servers.json
       "Username": "${VAULT_USER}",
       "Host": "db",
       "SSLMode": "prefer",
-      "MaintenanceDB": "${VAULT_DB}"
+      "MaintenanceDB": "${VAULT_DB}",
+      "PassFile": "/pgadmin4/pgpass"
     },
     "4": {
       "Name": "CrowdSec Veritabani",
@@ -171,7 +183,8 @@ cat <<EOF > pgadmin/servers.json
       "Username": "${CROWDSEC_USER}",
       "Host": "db",
       "SSLMode": "prefer",
-      "MaintenanceDB": "${CROWDSEC_DB}"
+      "MaintenanceDB": "${CROWDSEC_DB}",
+      "PassFile": "/pgadmin4/pgpass"
     }
   }
 }
@@ -179,6 +192,40 @@ EOF
 
 chmod 644 pgadmin/servers.json
 echo -e "${GREEN}[✓] pgAdmin sunucu listesi 4 veritabanıyla güncellendi (pgadmin/servers.json).${NC}"
+
+
+# pgpass dosyasını oluştur (hostname:port:database:username:password)
+PGPASS_FILE="pgadmin/pgpass"
+cat <<EOF > "$PGPASS_FILE"
+db:5432:*:${PG_USER}:${PG_PASS}
+db:5432:*:${GUAC_USER}:${GUAC_PASS}
+db:5432:*:${VAULT_USER}:${VAULT_PASS}
+db:5432:*:${CROWDSEC_USER}:${CROWDSEC_PASS}
+EOF
+
+# libpq zorunlu izinleri (0600 ve UID 5050)
+chmod 600 "$PGPASS_FILE"
+chown 5050:5050 "$PGPASS_FILE" 2>/dev/null || sudo chown 5050:5050 "$PGPASS_FILE" 2>/dev/null || true
+chmod 644 pgadmin/servers.json
+
+echo -e "${GREEN}[✓] pgAdmin pgpass ve CrowdSec PostgreSQL ayarları hazırlandı.${NC}"
+
+
+# CrowdSec config.yaml.local oluşturma
+cat <<'EOF' > crowdsec/config.yaml.local
+db_config:
+  log_level: info
+  type: postgresql
+  user: ${CROWDSEC_DB_USER}
+  password: ${CROWDSEC_DB_PASSWORD}
+  db_name: ${CROWDSEC_DB_NAME}
+  host: db
+  port: 5432
+  sslmode: disable
+EOF
+
+
+
 
 # -------------------------------------------------------------
 # TRAEFIK DASHBOARD HTPASSWD OLUŞTURMA

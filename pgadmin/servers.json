@@ -7,7 +7,8 @@
             "Username": "zitadel",
             "Host": "db",
             "SSLMode": "prefer",
-            "MaintenanceDB": "zitadel"
+            "MaintenanceDB": "zitadel",
+            "PassFile": "/pgadmin4/pgpass"
         },
         "2": {
             "Name": "Guacamole Veritabani",
@@ -16,7 +17,8 @@
             "Username": "guacamole",
             "Host": "db",
             "SSLMode": "prefer",
-            "MaintenanceDB": "guacamole_db"
+            "MaintenanceDB": "guacamole_db",
+            "PassFile": "/pgadmin4/pgpass"
         },
         "3": {
             "Name": "Vaultwarden Veritabani",
@@ -25,7 +27,8 @@
             "Username": "vaultwarden",
             "Host": "db",
             "SSLMode": "prefer",
-            "MaintenanceDB": "vaultwarden_db"
+            "MaintenanceDB": "vaultwarden_db",
+            "PassFile": "/pgadmin4/pgpass"
         },
         "4": {
             "Name": "CrowdSec Veritabani",
@@ -34,7 +37,8 @@
             "Username": "crowdsec",
             "Host": "db",
             "SSLMode": "prefer",
-            "MaintenanceDB": "crowdsec_db"
+            "MaintenanceDB": "crowdsec_db",
+            "PassFile": "/pgadmin4/pgpass"
         }
     }
 }

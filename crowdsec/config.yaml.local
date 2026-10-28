@@ -1,0 +1,9 @@
+db_config:
+  log_level: info
+  type: postgresql
+  user: ${CROWDSEC_DB_USER}
+  password: ${CROWDSEC_DB_PASSWORD}
+  db_name: ${CROWDSEC_DB_NAME}
+  host: db
+  port: 5432
+  sslmode: disable

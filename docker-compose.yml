@@ -67,6 +67,9 @@
       VAULTWARDEN_DB_USER: ${VAULTWARDEN_DB_USER}
       VAULTWARDEN_DB_PASSWORD: ${VAULTWARDEN_DB_PASSWORD}
       VAULTWARDEN_DB_NAME: ${VAULTWARDEN_DB_NAME}
+      CROWDSEC_DB_USER: ${CROWDSEC_DB_USER:-crowdsec}
+      CROWDSEC_DB_PASSWORD: ${CROWDSEC_DB_PASSWORD}
+      CROWDSEC_DB_NAME: ${CROWDSEC_DB_NAME:-crowdsec_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - postgres_backup:/backups
@@ -165,17 +168,24 @@
     image: crowdsecurity/crowdsec:latest
     container_name: crowdsec
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelist-good-actors"
       BOUNCER_KEY_traefik_bouncer: ${CROWDSEC_BOUNCER_API_KEY}
-      USE_WAL: "true" # SQLite WAL modunu etkinleştirir, yüksek I/O altında kilitlenmeleri önler
+      CROWDSEC_DB_USER: ${CROWDSEC_DB_USER:-crowdsec}
+      CROWDSEC_DB_PASSWORD: ${CROWDSEC_DB_PASSWORD}
+      CROWDSEC_DB_NAME: ${CROWDSEC_DB_NAME:-crowdsec_db}
     volumes:
       - crowdsec_config:/etc/crowdsec
       - crowdsec_data:/var/lib/crowdsec/data
+      - ./crowdsec/config.yaml.local:/etc/crowdsec/config.yaml.local:ro
       - traefik_logs:/var/log/traefik:ro
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     networks:
       - edge_network
+      - internal_network
 
   # ==========================================
   # 6. ROUTING TESTİ: WHOAMI
@@ -306,9 +316,12 @@
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: "True"
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_SERVER_JSON_FILE: "/pgadmin4/servers.json"
+      PGPASSFILE: "/pgadmin4/pgpass"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/pgadmin4/pgpass:ro
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     labels:
       - "traefik.enable=true"
