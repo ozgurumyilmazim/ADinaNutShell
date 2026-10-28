@@ -1,9 +1,18 @@
 http:
   routers:
-    opnsense-router:
-      rule: "Host(`opnsense.icat.intra`)"
+    opnsense-int:
+      rule: "Host(`opnsense.sirket.intra`)"
       entryPoints:
         - "websecure"
+      service: "opnsense-service"
+      tls: {}
+
+    opnsense-ext:
+      rule: "Host(`opnsense.sirket.com.tr`)"
+      entryPoints:
+        - "webexternal"
+      middlewares:
+        - "crowdsec@docker"
       service: "opnsense-service"
       tls: {}
 

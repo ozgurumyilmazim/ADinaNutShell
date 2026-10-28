@@ -2,8 +2,10 @@
 .env
 .env.local
 *.env
+!.env.ornek
+!env.ornek
 
-# Veritabanı ve yerel konteyner verileri
+# Veritabanı ve yerel hacim verileri
 data/
 postgres_data/
 

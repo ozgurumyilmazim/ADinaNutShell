@@ -12,7 +12,7 @@ NC='\033[0m'
 
 if [ ! -f "$ENV_FILE" ]; then
     echo -e "${RED}[X] Hata: '${ENV_FILE}' dosyası bulunamadı!${NC}"
-    echo -e "${YELLOW}Lütfen önce 'cp env.ornek .env' komutu ile dosyanızı oluşturun ve bu betiği çalıştırın.${NC}"
+    echo -e "${YELLOW}Lütfen önce 'cp env.ornek .env' komutu ile dosyanızı oluşturup bu betiği çalıştırın.${NC}"
     exit 1
 fi
 
@@ -40,19 +40,13 @@ echo -e "\n${BLUE}==============================================${NC}"
 echo -e "${BLUE}        MEVCUT .env YAPILANDIRMA ÖZETİ        ${NC}"
 echo -e "${BLUE}==============================================${NC}"
 
-printf "%-25s : %s\n" "Dahili Alan Adı" "$(get_env_val "DOMAIN_INT")"
-printf "%-25s : %s\n" "Harici Alan Adı" "$(get_env_val "DOMAIN_EXT")"
-echo -e "${BLUE}----------------------------------------------${NC}"
-printf "%-25s : %-30s | %s\n" "Servis" "Dış FQDN (Let's Encrypt)" "İç FQDN (UCS CA)"
-printf "%-25s : %-30s | %s\n" "Zitadel" "$(get_env_val "ZITADEL_FQDN")" "$(get_env_val "ZITADEL_INT_FQDN")"
-printf "%-25s : %-30s | %s\n" "OPNsense" "$(get_env_val "OPNSENSE_FQDN")" "$(get_env_val "OPNSENSE_INT_FQDN")"
-printf "%-25s : %-30s | %s\n" "Guacamole" "$(get_env_val "GUACAMOLE_FQDN")" "$(get_env_val "GUACAMOLE_INT_FQDN")"
-printf "%-25s : %-30s | %s\n" "Vaultwarden" "$(get_env_val "VAULTWARDEN_FQDN")" "$(get_env_val "VAULTWARDEN_INT_FQDN")"
-printf "%-25s : %-30s | %s\n" "Portainer" "$(get_env_val "PORTAINER_FQDN")" "$(get_env_val "PORTAINER_INT_FQDN")"
-printf "%-25s : %-30s | %s\n" "Whoami" "$(get_env_val "WHOAMI_FQDN")" "$(get_env_val "WHOAMI_INT_FQDN")"
-echo -e "${BLUE}----------------------------------------------${NC}"
-printf "%-25s : %s:%s\n" "OPNsense IP Hedefi" "$(get_env_val "OPNSENSE_INTERNAL_IP")" "$(get_env_val "OPNSENSE_INTERNAL_PORT")"
-printf "%-25s : %s (%s)\n" "UCS Samba 4 Hedefi" "$(get_env_val "UCS_HOST")" "$(get_env_val "UCS_IP")"
+printf "%-25s : %s | %s\n" "ZITADEL FQDN" "$(get_env_val "ZITADEL_INT_FQDN")" "$(get_env_val "ZITADEL_EXT_FQDN")"
+printf "%-25s : %s | %s\n" "PORTAINER FQDN" "$(get_env_val "PORTAINER_INT_FQDN")" "$(get_env_val "PORTAINER_EXT_FQDN")"
+printf "%-25s : %s | %s\n" "GUACAMOLE FQDN" "$(get_env_val "GUACAMOLE_INT_FQDN")" "$(get_env_val "GUACAMOLE_EXT_FQDN")"
+printf "%-25s : %s | %s\n" "VAULTWARDEN FQDN" "$(get_env_val "VAULTWARDEN_INT_FQDN")" "$(get_env_val "VAULTWARDEN_EXT_FQDN")"
+printf "%-25s : %s | %s\n" "WHOAMI FQDN" "$(get_env_val "WHOAMI_INT_FQDN")" "$(get_env_val "WHOAMI_EXT_FQDN")"
+printf "%-25s : %s:%s\n" "OPNSENSE_TARGET" "$(get_env_val "OPNSENSE_INTERNAL_IP")" "$(get_env_val "OPNSENSE_INTERNAL_PORT")"
+printf "%-25s : %s (%s)\n" "UCS_AD_TARGET" "$(get_env_val "UCS_HOST")" "$(get_env_val "UCS_IP")"
 
 echo -e "\n${BLUE}----------------------------------------------${NC}"
 echo -e "${BLUE}           GİZLİ BİLGİ VE ŞİFRE DENETİMİ      ${NC}"
@@ -67,13 +61,13 @@ manage_secret() {
     current_val=$(get_env_val "$key")
 
     if [ -z "$current_val" ]; then
-        echo -e "${YELLOW}[!] ${desc} (${key}) boş veya tanımsız.${NC}"
+        echo -e "${YELLOW}[!] ${desc} (${key}) boş.${NC}"
         local new_val
         new_val=$(gen_random_secret "$length")
         set_env_val "$key" "$new_val"
-        echo -e "${GREEN}    -> Yeni güçlü rastgele şifre atandı.${NC}"
+        echo -e "${GREEN}    -> Yeni rastgele değer atandı.${NC}"
     else
-        echo -e "${GREEN}[OK]${desc} (${key}) tanımlı.${NC}"
+        echo -e "${GREEN}[OK] ${desc} (${key}) tanımlı.${NC}"
         read -r -p "    -> Bu şifreyi YENİDEN üretmek ister misiniz? (e/H): " choice
         case "$choice" in
             [eE][vV][eE][tT]|[eE])
@@ -97,57 +91,47 @@ manage_secret() {
 }
 
 manage_secret "POSTGRES_PASSWORD" "PostgreSQL (Zitadel DB) Şifresi" 24 \
-    "Mevcut veritabanı volume'ü varken parola değişirse veritabanı erişilemez hale gelir!"
+    "Mevcut veritabanı volume'ü varsa PostgreSQL konteyneri şifre uyuşmazlığı nedeniyle başlatılamaz!"
 
 manage_secret "GUACAMOLE_DB_PASSWORD" "Guacamole PostgreSQL Şifresi" 24 \
-    "Guacamole veritabanı parolası değiştiğinde Guacamole servisi oturum açamaz!"
+    "Guacamole veritabanı şifresi değişirse Guacamole servisi oturum açamaz!"
 
 manage_secret "VAULTWARDEN_DB_PASSWORD" "Vaultwarden PostgreSQL Şifresi" 24 \
     "Vaultwarden DB parolası değişirse parola kasası veritabanına bağlanamaz!"
 
 manage_secret "ZITADEL_MASTERKEY" "Zitadel Master Key (32 Karakter)" 32 \
-    "KRİTİK: Masterkey değiştiğinde Zitadel veritabanındaki kayıtları ÇÖZEMEZ. KALICI VERİ KAYBI OLUŞUR!"
+    "KRİTİK: Masterkey değiştiğinde Zitadel veritabanındaki şifreli kayıtları ÇÖZEMEZ. KALICI VERİ KAYBI OLUŞUR!"
 
 manage_secret "ZITADEL_ADMIN_PASSWORD" "Zitadel İlk Kurulum Admin Şifresi" 24 \
-    "Bu şifre yalnızca ilk kurulumda geçerlidir; var olan veritabanı üzerinde etkisi olmaz."
+    "Yalnızca ilk kurulumda kullanılır; mevcut veritabanını etkilemez."
 
 manage_secret "VAULTWARDEN_ADMIN_TOKEN" "Vaultwarden /admin Giriş Tokenı" 32 \
     "Vaultwarden yönetim paneli erişim anahtarı yenilenir."
 
-# Zitadel Masterkey Uzunluk Denetimi
+manage_secret "CROWDSEC_BOUNCER_API_KEY" "CrowdSec Traefik Plugin API Key" 32 \
+    "API Key değişirse Traefik plugin CrowdSec LAPI ile konuşamaz ve harici istekler 403 hatasına düşer!"
+
 FINAL_MASTERKEY=$(get_env_val "ZITADEL_MASTERKEY")
 if [ -n "$FINAL_MASTERKEY" ] && [ "${#FINAL_MASTERKEY}" -ne 32 ]; then
-    echo -e "\n${RED}[!] DİKKAT: ZITADEL_MASTERKEY uzunluğu ${#FINAL_MASTERKEY} karakter.${NC}"
-    echo -e "${RED}Zitadel için tam 32 karakter (256-bit) zorunludur.${NC}"
+    echo -e "\n${RED}[!] DİKKAT: ZITADEL_MASTERKEY tam 32 karakter olmalıdır! (Şu an: ${#FINAL_MASTERKEY})${NC}"
     read -r -p "32 karakterlik yeni anahtar atansın mı? (evet/HAYIR): " mk_confirm
     if [ "$mk_confirm" = "evet" ]; then
         CORRECTED_KEY=$(gen_random_secret 32)
         set_env_val "ZITADEL_MASTERKEY" "$CORRECTED_KEY"
         echo -e "${GREEN}[✓] 32 karakterlik yeni ZITADEL_MASTERKEY atandı.${NC}"
-    else
-        echo -e "${YELLOW}Değişiklik yapılmadı. Dosyayı manuel kontrol ediniz.${NC}"
     fi
 fi
 
-# Dosya ve Sertifika İzin Denetimleri
+# ACME ve Dizin İzinleri
 CERTS_DIR="traefik/certs"
 ACME_FILE="${CERTS_DIR}/acme.json"
 mkdir -p "$CERTS_DIR"
-
 if [ ! -f "$ACME_FILE" ]; then
     touch "$ACME_FILE"
-    chmod 600 "$ACME_FILE"
-    echo -e "${GREEN}[✓]${ACME_FILE} oluşturuldu ve 'chmod 600' yetkisi verildi.${NC}"
-else
-    chmod 600 "$ACME_FILE"
 fi
-
-CF_TOKEN=$(get_env_val "CF_DNS_API_TOKEN")
-if [ -z "$CF_TOKEN" ] \vert{}\vert{} [ "$CF_TOKEN" = "Buraya_Cloudflare_DNS_API_Token_Gelecek" ]; then
-    echo -e "\n${YELLOW}[!] UYARI: CF_DNS_API_TOKEN tanımlanmamış. Let's Encrypt DNS Challenge çalışmayabilir.${NC}"
-fi
+chmod 600 "$ACME_FILE"
 
 echo -e "\n${GREEN}==============================================${NC}"
-echo -e "${GREEN}    TÜM KONTROLLER BAŞARIYLA TAMAMLANDI       ${NC}"
+echo -e "${GREEN}    TÜM BİLEŞENLER VE .env HAZIRLANDI         ${NC}"
 echo -e "${GREEN}==============================================${NC}"
 echo -e "Yığını başlatmak için: ${YELLOW}docker compose up -d${NC}\n"

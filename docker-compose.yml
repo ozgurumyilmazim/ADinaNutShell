@@ -16,12 +16,15 @@ services:
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.webexternal.address=:444"
+      - "--entrypoints.websecure.address=:443" # Dahili (.intra - UCS CA)
+      - "--entrypoints.webexternal.address=:444" # Harici (.com.tr - Cloudflare/Tailscale)
       # Log Yönetimi (CrowdSec için)
       - "--accesslog=true"
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--accesslog.bufferingsize=100"
+      # CrowdSec Dahili Traefik Plugin Tanımı
+      - "--experimental.plugins.crowdsec.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.plugins.crowdsec.version=v1.4.1"
       # Let's Encrypt DNS Challenge (Cloudflare)
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/certs/acme.json"
@@ -31,19 +34,29 @@ services:
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     ports:
-      - "80:80"     # Dahili HTTP (HTTPS'e yönlendirilir)
-      - "443:443"   # Dahili HTTPS (websecure - UCS sertifikaları / .intra)
-      - "444:444"   # Harici HTTPS (webexternal - Cloudflare Tunnel & Tailscale / .com.tr)
+      - "80:80"
+      - "443:443"
+      - "444:444"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
       - ./traefik/certs:/certs:rw
       - traefik_logs:/var/log/traefik
+      - traefik_plugins:/plugins-storage
+    labels:
+      - "traefik.enable=true"
+      # CrowdSec Plugin Middleware Tanımı
+      - "traefik.http.middlewares.crowdsec.plugin.crowdsec.enabled=true"
+      - "traefik.http.middlewares.crowdsec.plugin.crowdsec.crowdseclapihost=crowdsec:8080"
+      - "traefik.http.middlewares.crowdsec.plugin.crowdsec.crowdseclapischeme=http"
+      - "traefik.http.middlewares.crowdsec.plugin.crowdsec.crowdseclapikey=${CROWDSEC_BOUNCER_API_KEY}"
+      - "traefik.http.middlewares.crowdsec.plugin.crowdsec.updateintervalseconds=15"
+      - "traefik.http.middlewares.crowdsec.plugin.crowdsec.defaultdecisionseconds=60"
     networks:
       - edge_network
 
   # ==========================================
-  # 2. VERİTABANI: POSTGRESQL 16
+  # 2. MERKEZİ VERİTABANI: POSTGRESQL 16
   # ==========================================
   zitadel-db:
     image: postgres:16-alpine
@@ -64,7 +77,7 @@ services:
       - postgres_backup:/backups
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -92,7 +105,7 @@ services:
       ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: ${POSTGRES_USER}
       ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD}
       ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
-      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_FQDN}
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_INT_FQDN}
       ZITADEL_EXTERNALPORT: 443
       ZITADEL_EXTERNALSECURE: "true"
       ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ZITADEL_ORG_NAME}
@@ -100,18 +113,18 @@ services:
       ZITADEL_FIRSTINSTANCE_USER_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
     labels:
       - "traefik.enable=true"
-      # Dahili Erişim (.intra) -> Port 443
-      - "traefik.http.routers.zitadel-int.rule=Host(`${ZITADEL_FQDN}`)"
+      # Router 1: Dahili (.intra -> 443)
+      - "traefik.http.routers.zitadel-int.rule=Host(`${ZITADEL_INT_FQDN}`)"
       - "traefik.http.routers.zitadel-int.entrypoints=websecure"
       - "traefik.http.routers.zitadel-int.tls=true"
       - "traefik.http.routers.zitadel-int.service=zitadel-svc"
-      # Harici Erişim (.com.tr) -> Port 444
-      - "traefik.http.routers.zitadel-ext.rule=Host(`auth.${DOMAIN_EXT}`)"
+      # Router 2: Harici (.com.tr -> 444 + CrowdSec Koruması)
+      - "traefik.http.routers.zitadel-ext.rule=Host(`${ZITADEL_EXT_FQDN}`)"
       - "traefik.http.routers.zitadel-ext.entrypoints=webexternal"
       - "traefik.http.routers.zitadel-ext.tls=true"
-      - "traefik.http.routers.zitadel-ext.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.zitadel-ext.middlewares=crowdsec@docker"
       - "traefik.http.routers.zitadel-ext.service=zitadel-svc"
-      # Ortak gRPC / h2c Arka Uç
+      # Ortak gRPC / h2c Port
       - "traefik.http.services.zitadel-svc.loadbalancer.server.port=8080"
       - "traefik.http.services.zitadel-svc.loadbalancer.server.scheme=h2c"
     networks:
@@ -130,17 +143,23 @@ services:
       - portainer_data:/data
     labels:
       - "traefik.enable=true"
-      # Yalnızca Dahili Ağdan Erişim
-      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_FQDN}`)"
-      - "traefik.http.routers.portainer.entrypoints=websecure"
-      - "traefik.http.routers.portainer.tls=true"
-      - "traefik.http.routers.portainer.service=portainer-svc"
+      # Router 1: Dahili (.intra -> 443)
+      - "traefik.http.routers.portainer-int.rule=Host(`${PORTAINER_INT_FQDN}`)"
+      - "traefik.http.routers.portainer-int.entrypoints=websecure"
+      - "traefik.http.routers.portainer-int.tls=true"
+      - "traefik.http.routers.portainer-int.service=portainer-svc"
+      # Router 2: Harici (.com.tr -> 444 + CrowdSec Koruması)
+      - "traefik.http.routers.portainer-ext.rule=Host(`${PORTAINER_EXT_FQDN}`)"
+      - "traefik.http.routers.portainer-ext.entrypoints=webexternal"
+      - "traefik.http.routers.portainer-ext.tls=true"
+      - "traefik.http.routers.portainer-ext.middlewares=crowdsec@docker"
+      - "traefik.http.routers.portainer-ext.service=portainer-svc"
       - "traefik.http.services.portainer-svc.loadbalancer.server.port=9000"
     networks:
       - edge_network
 
   # ==========================================
-  # 5. GÜVENLİK / IPS: CROWDSEC
+  # 5. GÜVENLİK / IPS MOTORU: CROWDSEC
   # ==========================================
   crowdsec:
     image: crowdsecurity/crowdsec:latest
@@ -148,6 +167,7 @@ services:
     restart: unless-stopped
     environment:
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelist-good-actors"
+      BOUNCER_KEY_traefik_bouncer: ${CROWDSEC_BOUNCER_API_KEY}
     volumes:
       - crowdsec_config:/etc/crowdsec
       - crowdsec_data:/var/lib/crowdsec/data
@@ -164,16 +184,16 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      # Dahili Doğrulama
-      - "traefik.http.routers.whoami-int.rule=Host(`${WHOAMI_FQDN}`)"
+      # Router 1: Dahili (.intra -> 443)
+      - "traefik.http.routers.whoami-int.rule=Host(`${WHOAMI_INT_FQDN}`)"
       - "traefik.http.routers.whoami-int.entrypoints=websecure"
       - "traefik.http.routers.whoami-int.tls=true"
       - "traefik.http.routers.whoami-int.service=whoami-svc"
-      # Harici Tünel Testi
-      - "traefik.http.routers.whoami-ext.rule=Host(`whoami.${DOMAIN_EXT}`)"
+      # Router 2: Harici (.com.tr -> 444 + CrowdSec Koruması)
+      - "traefik.http.routers.whoami-ext.rule=Host(`${WHOAMI_EXT_FQDN}`)"
       - "traefik.http.routers.whoami-ext.entrypoints=webexternal"
       - "traefik.http.routers.whoami-ext.tls=true"
-      - "traefik.http.routers.whoami-ext.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.whoami-ext.middlewares=crowdsec@docker"
       - "traefik.http.routers.whoami-ext.service=whoami-svc"
       - "traefik.http.services.whoami-svc.loadbalancer.server.port=80"
     networks:
@@ -202,7 +222,7 @@ services:
       - edge_network
 
   # ==========================================
-  # 8. SIFIR-PORT HARİCİ TÜNEL: CLOUDFLARE
+  # 8. SIFIR-PORT DIŞ TÜNEL: CLOUDFLARE
   # ==========================================
   cloudflare:
     image: cloudflare/cloudflared:latest
@@ -245,11 +265,17 @@ services:
       - guacamole_home:/home/guacamole/.guacamole
     labels:
       - "traefik.enable=true"
-      # Yalnızca Dahili Ağdan Erişim
-      - "traefik.http.routers.guacamole.rule=Host(`${GUACAMOLE_FQDN}`)"
-      - "traefik.http.routers.guacamole.entrypoints=websecure"
-      - "traefik.http.routers.guacamole.tls=true"
-      - "traefik.http.routers.guacamole.service=guacamole-svc"
+      # Router 1: Dahili (.intra -> 443)
+      - "traefik.http.routers.guacamole-int.rule=Host(`${GUACAMOLE_INT_FQDN}`)"
+      - "traefik.http.routers.guacamole-int.entrypoints=websecure"
+      - "traefik.http.routers.guacamole-int.tls=true"
+      - "traefik.http.routers.guacamole-int.service=guacamole-svc"
+      # Router 2: Harici (.com.tr -> 444 + CrowdSec Koruması)
+      - "traefik.http.routers.guacamole-ext.rule=Host(`${GUACAMOLE_EXT_FQDN}`)"
+      - "traefik.http.routers.guacamole-ext.entrypoints=webexternal"
+      - "traefik.http.routers.guacamole-ext.tls=true"
+      - "traefik.http.routers.guacamole-ext.middlewares=crowdsec@docker"
+      - "traefik.http.routers.guacamole-ext.service=guacamole-svc"
       - "traefik.http.services.guacamole-svc.loadbalancer.server.port=8080"
     networks:
       - edge_network
@@ -266,7 +292,7 @@ services:
       zitadel-db:
         condition: service_healthy
     environment:
-      - DOMAIN=https://${VAULTWARDEN_FQDN}
+      - DOMAIN=https://${VAULTWARDEN_INT_FQDN}
       - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
       - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
       - INVITATIONS_ALLOWED=true
@@ -276,22 +302,25 @@ services:
       - vaultwarden_data:/data
     labels:
       - "traefik.enable=true"
-      # Dahili Erişim (.intra) -> Port 443
-      - "traefik.http.routers.vaultwarden-int.rule=Host(`${VAULTWARDEN_FQDN}`)"
+      # Router 1: Dahili (.intra -> 443)
+      - "traefik.http.routers.vaultwarden-int.rule=Host(`${VAULTWARDEN_INT_FQDN}`)"
       - "traefik.http.routers.vaultwarden-int.entrypoints=websecure"
       - "traefik.http.routers.vaultwarden-int.tls=true"
       - "traefik.http.routers.vaultwarden-int.service=vaultwarden-svc"
-      # Harici Erişim (.com.tr) -> Port 444
-      - "traefik.http.routers.vaultwarden-ext.rule=Host(`vault.${DOMAIN_EXT}`)"
+      # Router 2: Harici (.com.tr -> 444 + CrowdSec Koruması)
+      - "traefik.http.routers.vaultwarden-ext.rule=Host(`${VAULTWARDEN_EXT_FQDN}`)"
       - "traefik.http.routers.vaultwarden-ext.entrypoints=webexternal"
       - "traefik.http.routers.vaultwarden-ext.tls=true"
-      - "traefik.http.routers.vaultwarden-ext.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.vaultwarden-ext.middlewares=crowdsec@docker"
       - "traefik.http.routers.vaultwarden-ext.service=vaultwarden-svc"
       - "traefik.http.services.vaultwarden-svc.loadbalancer.server.port=80"
     networks:
       - edge_network
       - internal_network
 
+# ==========================================
+# AĞ VE KALICI HACİM TANIMLARI
+# ==========================================
 networks:
   edge_network:
     name: edge_network
@@ -316,6 +345,8 @@ volumes:
     name: tailscale_data
   traefik_logs:
     name: traefik_logs
+  traefik_plugins:
+    name: traefik_plugins
   guacamole_home:
     name: guacamole_home
   vaultwarden_data:
