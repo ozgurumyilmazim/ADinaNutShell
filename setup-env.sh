@@ -111,6 +111,27 @@ manage_secret "VAULTWARDEN_ADMIN_TOKEN" "Vaultwarden /admin Giriş Tokenı" 32 \
 manage_secret "CROWDSEC_BOUNCER_API_KEY" "CrowdSec Traefik Plugin API Key" 32 \
     "API Key değişirse Traefik plugin CrowdSec LAPI ile konuşamaz ve harici istekler 403 hatasına düşer!"
 
+
+# -------------------------------------------------------------
+# TRAEFIK DASHBOARD HTPASSWD OLUŞTURMA
+# -------------------------------------------------------------
+manage_secret "TRAEFIK_DASHBOARD_PASSWORD" "Traefik Dashboard Admin Şifresi" 24 \
+    "Traefik dashboard yönetim arayüzü giriş parolası yenilenir."
+
+DASH_USER=$(get_env_val "TRAEFIK_DASHBOARD_USER")
+DASH_USER=${DASH_USER:-admin}
+DASH_PASS=$(get_env_val "TRAEFIK_DASHBOARD_PASSWORD")
+USERS_FILE="traefik/dynamic/usersfile"
+
+if [ -n "$DASH_PASS" ]; then
+    # OpenSSL ile MD5/Apache formatında parola hash üretimi (harici paket gerektirmez)
+    HASH=$(openssl passwd -apr1 "$DASH_PASS")
+    echo "${DASH_USER}:${HASH}" > "$USERS_FILE"
+    chmod 600 "$USERS_FILE"
+    echo -e "${GREEN}[✓] Traefik dashboard kimlik dosyası güncellendi (${USERS_FILE})${NC}"
+fi
+
+
 FINAL_MASTERKEY=$(get_env_val "ZITADEL_MASTERKEY")
 if [ -n "$FINAL_MASTERKEY" ] && [ "${#FINAL_MASTERKEY}" -ne 32 ]; then
     echo -e "\n${RED}[!] DİKKAT: ZITADEL_MASTERKEY tam 32 karakter olmalıdır! (Şu an: ${#FINAL_MASTERKEY})${NC}"

@@ -1,0 +1,57 @@
+http:
+  # ==========================================
+  # 1. MIDDLEWARE TANIMLARI
+  # ==========================================
+  middlewares:
+    # Basic Auth Kimlik Doğrulaması
+    dashboard-auth:
+      basicAuth:
+        usersFile: "/etc/traefik/dynamic/usersfile"
+        removeHeader: true
+
+    # Yalnızca Dahili Özel IP Aralıklarına İzin Veren Filtre (Dışarıya 403 Döner)
+    internal-only-ip:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+
+  # ==========================================
+  # 2. ROUTER VE ERİŞİM POLİTİKALARI
+  # ==========================================
+  routers:
+    # --- A) DAHİLİ ERİŞİM (.intra -> Port 443: Tam Yetkili) ---
+    traefik-dashboard-int:
+      rule: "Host(`traefik.sirket.intra`)"
+      entryPoints:
+        - "websecure"
+      tls: {}
+      service: "api@internal"
+      middlewares:
+        - "dashboard-auth"
+
+    # --- B) HARİCİ BLOKLAMA KURALI (Yüksek Öncelik: Priority 100) ---
+    # /api/rawdata, kök /api veya doğrudan durum listelemelerini dış ağda engeller
+    traefik-api-ext-block:
+      rule: "Host(`traefik.sirket.com.tr`) && (PathPrefix(`/api/rawdata`) || Path(`/api`))"
+      entryPoints:
+        - "webexternal"
+      priority: 100
+      middlewares:
+        - "internal-only-ip" # Dışarıdan gelen IP'ler eşleşmediği için 403 Forbidden alır
+      service: "api@internal"
+      tls: {}
+
+    # --- C) HARİCİ ARAYÜZ ERİŞİMİ (.com.tr -> Port 444: Sadece Dashboard UI) ---
+    traefik-dashboard-ext:
+      rule: "Host(`traefik.sirket.com.tr`)"
+      entryPoints:
+        - "webexternal"
+      priority: 10
+      service: "api@internal"
+      tls: {}
+      middlewares:
+        - "crowdsec@file"
+        - "dashboard-auth"
