@@ -28,7 +28,7 @@ Merkezi kimlik yönetimi (Univention Corporate Server Samba 4 Active Directory &
 
 ### 1. Depoyu Klonlayın
 ```bash
-git clone [https://github.com/](https://github.com/)<kullanici-adiniz>/infra-identity-gateway.git
+git clone https://github.com/ozgurumyilmazim/infra-identity-gateway.git
 cd infra-identity-gateway
 
 
