@@ -47,6 +47,7 @@ printf "%-25s : %s | %s\n" "VAULTWARDEN FQDN" "$(get_env_val "VAULTWARDEN_INT_FQ
 printf "%-25s : %s | %s\n" "WHOAMI FQDN" "$(get_env_val "WHOAMI_INT_FQDN")" "$(get_env_val "WHOAMI_EXT_FQDN")"
 printf "%-25s : %s:%s\n" "OPNSENSE_TARGET" "$(get_env_val "OPNSENSE_INTERNAL_IP")" "$(get_env_val "OPNSENSE_INTERNAL_PORT")"
 printf "%-25s : %s (%s)\n" "UCS_AD_TARGET" "$(get_env_val "UCS_HOST")" "$(get_env_val "UCS_IP")"
+printf "%-25s : %s | %s\n" "PGADMIN FQDN" "$(get_env_val "PGADMIN_INT_FQDN")" "$(get_env_val "PGADMIN_EXT_FQDN")"
 
 echo -e "\n${BLUE}----------------------------------------------${NC}"
 echo -e "${BLUE}           GİZLİ BİLGİ VE ŞİFRE DENETİMİ      ${NC}"
@@ -111,6 +112,73 @@ manage_secret "VAULTWARDEN_ADMIN_TOKEN" "Vaultwarden /admin Giriş Tokenı" 32 \
 manage_secret "CROWDSEC_BOUNCER_API_KEY" "CrowdSec Traefik Plugin API Key" 32 \
     "API Key değişirse Traefik plugin CrowdSec LAPI ile konuşamaz ve harici istekler 403 hatasına düşer!"
 
+manage_secret "PGADMIN_DEFAULT_PASSWORD" "pgAdmin 4 Giriş Parolası" 24 \
+    "pgAdmin yönetici parolası yenilenir."
+
+manage_secret "CROWDSEC_DB_PASSWORD" "CrowdSec PostgreSQL Şifresi" 24 \
+    "CrowdSec veritabanı parolası değişirse CrowdSec LAPI PostgreSQL'e erişemez!"
+    
+# -------------------------------------------------------------
+# PGADMIN OTOMATIK SUNUCU TANIMLARI (servers.json)
+# -------------------------------------------------------------
+mkdir -p pgadmin
+
+PG_USER=$(get_env_val "POSTGRES_USER")
+PG_DB=$(get_env_val "POSTGRES_DB")
+GUAC_USER=$(get_env_val "GUACAMOLE_DB_USER")
+GUAC_DB=$(get_env_val "GUACAMOLE_DB_NAME")
+VAULT_USER=$(get_env_val "VAULTWARDEN_DB_USER")
+VAULT_DB=$(get_env_val "VAULTWARDEN_DB_NAME")
+CROWDSEC_USER=$(get_env_val "CROWDSEC_DB_USER")
+CROWDSEC_USER=${CROWDSEC_USER:-crowdsec}
+CROWDSEC_DB=$(get_env_val "CROWDSEC_DB_NAME")
+CROWDSEC_DB=${CROWDSEC_DB:-crowdsec_db}
+
+cat <<EOF > pgadmin/servers.json
+{
+  "Servers": {
+    "1": {
+      "Name": "PostgreSQL (Merkezi Kümeler - Tum DB'ler)",
+      "Group": "Sirket Altyapi",
+      "Port": 5432,
+      "Username": "${PG_USER}",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "${PG_DB}"
+    },
+    "2": {
+      "Name": "Guacamole Veritabani",
+      "Group": "Servis Veritabanlari",
+      "Port": 5432,
+      "Username": "${GUAC_USER}",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "${GUAC_DB}"
+    },
+    "3": {
+      "Name": "Vaultwarden Veritabani",
+      "Group": "Servis Veritabanlari",
+      "Port": 5432,
+      "Username": "${VAULT_USER}",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "${VAULT_DB}"
+    },
+    "4": {
+      "Name": "CrowdSec Veritabani",
+      "Group": "Servis Veritabanlari",
+      "Port": 5432,
+      "Username": "${CROWDSEC_USER}",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "${CROWDSEC_DB}"
+    }
+  }
+}
+EOF
+
+chmod 644 pgadmin/servers.json
+echo -e "${GREEN}[✓] pgAdmin sunucu listesi 4 veritabanıyla güncellendi (pgadmin/servers.json).${NC}"
 
 # -------------------------------------------------------------
 # TRAEFIK DASHBOARD HTPASSWD OLUŞTURMA
