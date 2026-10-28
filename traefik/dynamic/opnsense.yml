@@ -10,11 +10,7 @@ http:
   services:
     opnsense-service:
       loadBalancer:
-        serversTransport: "opnsenseTransport"
+        serversTransport: "ucsInternalTransport"
         servers:
           - url: "https://172.16.1.1:443"
         passHostHeader: true
-
-  serversTransports:
-    opnsenseTransport:
-      insecureSkipVerify: true

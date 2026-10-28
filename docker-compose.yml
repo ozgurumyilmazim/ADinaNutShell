@@ -1,6 +1,6 @@
 services:
   # ==========================================
-  # 1. INGRESS & REVERSE PROXY: TRAEFIK
+  # 1. INGRESS & REVERSE PROXY: TRAEFIK v3.1
   # ==========================================
   traefik:
     image: traefik:v3.1
@@ -12,26 +12,28 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
+      # Giriş Noktaları (EntryPoints)
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.webexternal.address=:444"
+      # Log Yönetimi (CrowdSec için)
       - "--accesslog=true"
       - "--accesslog.filepath=/var/log/traefik/access.log"
       - "--accesslog.bufferingsize=100"
-      # Let's Encrypt Cloudflare DNS Challenge
+      # Let's Encrypt DNS Challenge (Cloudflare)
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/certs/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
-      # TXT kaydının yayılmasını doğrulamak için genel DNS resolver tanımları:
       - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
     environment:
-      # Cloudflare DNS API Token (Lego kütüphanesi bu değişkeni okur)
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:80"     # Dahili HTTP (HTTPS'e yönlendirilir)
+      - "443:443"   # Dahili HTTPS (websecure - UCS sertifikaları / .intra)
+      - "444:444"   # Harici HTTPS (webexternal - Cloudflare Tunnel & Tailscale / .com.tr)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
@@ -40,9 +42,8 @@ services:
     networks:
       - edge_network
 
-
   # ==========================================
-  # 2. VERİTABANI: POSTGRESQL (ZITADEL, GUAC, VAULT)
+  # 2. VERİTABANI: POSTGRESQL 16
   # ==========================================
   zitadel-db:
     image: postgres:16-alpine
@@ -71,7 +72,7 @@ services:
       - internal_network
 
   # ==========================================
-  # 3. IDENTITY PROVIDER & SSO: ZITADEL
+  # 3. IAM & SSO: ZITADEL
   # ==========================================
   zitadel:
     image: ghcr.io/zitadel/zitadel:latest
@@ -99,10 +100,18 @@ services:
       ZITADEL_FIRSTINSTANCE_USER_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.zitadel.rule=Host(`${ZITADEL_FQDN}`)"
-      - "traefik.http.routers.zitadel.entrypoints=websecure"
-      - "traefik.http.routers.zitadel.tls=true"
-      - "traefik.http.routers.zitadel.service=zitadel-svc"
+      # Dahili Erişim (.intra) -> Port 443
+      - "traefik.http.routers.zitadel-int.rule=Host(`${ZITADEL_FQDN}`)"
+      - "traefik.http.routers.zitadel-int.entrypoints=websecure"
+      - "traefik.http.routers.zitadel-int.tls=true"
+      - "traefik.http.routers.zitadel-int.service=zitadel-svc"
+      # Harici Erişim (.com.tr) -> Port 444
+      - "traefik.http.routers.zitadel-ext.rule=Host(`auth.${DOMAIN_EXT}`)"
+      - "traefik.http.routers.zitadel-ext.entrypoints=webexternal"
+      - "traefik.http.routers.zitadel-ext.tls=true"
+      - "traefik.http.routers.zitadel-ext.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.zitadel-ext.service=zitadel-svc"
+      # Ortak gRPC / h2c Arka Uç
       - "traefik.http.services.zitadel-svc.loadbalancer.server.port=8080"
       - "traefik.http.services.zitadel-svc.loadbalancer.server.scheme=h2c"
     networks:
@@ -110,7 +119,7 @@ services:
       - internal_network
 
   # ==========================================
-  # 4. CONTAINER YÖNETİMİ: PORTAINER CE
+  # 4. KONTEYNER YÖNETİMİ: PORTAINER CE
   # ==========================================
   portainer:
     image: portainer/portainer-ce:latest
@@ -121,7 +130,8 @@ services:
       - portainer_data:/data
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_EXT}`)"
+      # Yalnızca Dahili Ağdan Erişim
+      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_FQDN}`)"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.routers.portainer.tls=true"
       - "traefik.http.routers.portainer.service=portainer-svc"
@@ -130,7 +140,7 @@ services:
       - edge_network
 
   # ==========================================
-  # 5. INTRUSION PREVENTION: CROWDSEC
+  # 5. GÜVENLİK / IPS: CROWDSEC
   # ==========================================
   crowdsec:
     image: crowdsecurity/crowdsec:latest
@@ -146,7 +156,7 @@ services:
       - edge_network
 
   # ==========================================
-  # 6. ROUTING TEST SERVİSİ: WHOAMI
+  # 6. ROUTING TESTİ: WHOAMI
   # ==========================================
   whoami:
     image: traefik/whoami:latest
@@ -154,9 +164,18 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.whoami.rule=Host(`${WHOAMI_EXT}`)"
-      - "traefik.http.routers.whoami.entrypoints=websecure"
-      - "traefik.http.routers.whoami.tls=true"
+      # Dahili Doğrulama
+      - "traefik.http.routers.whoami-int.rule=Host(`${WHOAMI_FQDN}`)"
+      - "traefik.http.routers.whoami-int.entrypoints=websecure"
+      - "traefik.http.routers.whoami-int.tls=true"
+      - "traefik.http.routers.whoami-int.service=whoami-svc"
+      # Harici Tünel Testi
+      - "traefik.http.routers.whoami-ext.rule=Host(`whoami.${DOMAIN_EXT}`)"
+      - "traefik.http.routers.whoami-ext.entrypoints=webexternal"
+      - "traefik.http.routers.whoami-ext.tls=true"
+      - "traefik.http.routers.whoami-ext.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.whoami-ext.service=whoami-svc"
+      - "traefik.http.services.whoami-svc.loadbalancer.server.port=80"
     networks:
       - edge_network
 
@@ -226,7 +245,8 @@ services:
       - guacamole_home:/home/guacamole/.guacamole
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.guacamole.rule=Host(`${GUACAMOLE_EXT}`)"
+      # Yalnızca Dahili Ağdan Erişim
+      - "traefik.http.routers.guacamole.rule=Host(`${GUACAMOLE_FQDN}`)"
       - "traefik.http.routers.guacamole.entrypoints=websecure"
       - "traefik.http.routers.guacamole.tls=true"
       - "traefik.http.routers.guacamole.service=guacamole-svc"
@@ -256,17 +276,22 @@ services:
       - vaultwarden_data:/data
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.vaultwarden.rule=Host(`${VAULTWARDEN_FQDN}`)"
-      - "traefik.http.routers.vaultwarden.entrypoints=websecure"
-      - "traefik.http.routers.vaultwarden.tls=true"
-      - "traefik.http.routers.vaultwarden.service=vaultwarden-svc"
+      # Dahili Erişim (.intra) -> Port 443
+      - "traefik.http.routers.vaultwarden-int.rule=Host(`${VAULTWARDEN_FQDN}`)"
+      - "traefik.http.routers.vaultwarden-int.entrypoints=websecure"
+      - "traefik.http.routers.vaultwarden-int.tls=true"
+      - "traefik.http.routers.vaultwarden-int.service=vaultwarden-svc"
+      # Harici Erişim (.com.tr) -> Port 444
+      - "traefik.http.routers.vaultwarden-ext.rule=Host(`vault.${DOMAIN_EXT}`)"
+      - "traefik.http.routers.vaultwarden-ext.entrypoints=webexternal"
+      - "traefik.http.routers.vaultwarden-ext.tls=true"
+      - "traefik.http.routers.vaultwarden-ext.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.vaultwarden-ext.service=vaultwarden-svc"
       - "traefik.http.services.vaultwarden-svc.loadbalancer.server.port=80"
     networks:
       - edge_network
       - internal_network
-# ==========================================
-# AĞ VE HACİM (NETWORK & VOLUME) TANIMLARI
-# ==========================================
+
 networks:
   edge_network:
     name: edge_network

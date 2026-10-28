@@ -12,7 +12,7 @@ NC='\033[0m'
 
 if [ ! -f "$ENV_FILE" ]; then
     echo -e "${RED}[X] Hata: '${ENV_FILE}' dosyası bulunamadı!${NC}"
-    echo -e "${YELLOW}Lütfen önce 'cp .env.example .env' komutu ile dosyanızı oluşturun, temel ağ/UCS ayarlarınızı düzenleyin ve bu betiği tekrar çalıştırın.${NC}"
+    echo -e "${YELLOW}Lütfen önce 'cp env.ornek .env' komutu ile dosyanızı oluşturun ve bu betiği çalıştırın.${NC}"
     exit 1
 fi
 
@@ -40,14 +40,19 @@ echo -e "\n${BLUE}==============================================${NC}"
 echo -e "${BLUE}        MEVCUT .env YAPILANDIRMA ÖZETİ        ${NC}"
 echo -e "${BLUE}==============================================${NC}"
 
-printf "%-25s : %s\n" "DOMAIN_INT" "$(get_env_val "DOMAIN_INT")"
-printf "%-25s : %s\n" "DOMAIN_EXT" "$(get_env_val "DOMAIN_EXT")"
-printf "%-25s : %s\n" "ZITADEL_FQDN" "$(get_env_val "ZITADEL_FQDN")"
-printf "%-25s : %s\n" "OPNSENSE_FQDN" "$(get_env_val "OPNSENSE_FQDN")"
-printf "%-25s : %s\n" "GUACAMOLE_FQDN" "$(get_env_val "GUACAMOLE_FQDN")"
-printf "%-25s : %s\n" "VAULTWARDEN_FQDN" "$(get_env_val "VAULTWARDEN_FQDN")"
-printf "%-25s : %s:%s\n" "OPNSENSE_TARGET" "$(get_env_val "OPNSENSE_INTERNAL_IP")" "$(get_env_val "OPNSENSE_INTERNAL_PORT")"
-printf "%-25s : %s (%s)\n" "UCS_AD_TARGET" "$(get_env_val "UCS_HOST")" "$(get_env_val "UCS_IP")"
+printf "%-25s : %s\n" "Dahili Alan Adı" "$(get_env_val "DOMAIN_INT")"
+printf "%-25s : %s\n" "Harici Alan Adı" "$(get_env_val "DOMAIN_EXT")"
+echo -e "${BLUE}----------------------------------------------${NC}"
+printf "%-25s : %-30s | %s\n" "Servis" "Dış FQDN (Let's Encrypt)" "İç FQDN (UCS CA)"
+printf "%-25s : %-30s | %s\n" "Zitadel" "$(get_env_val "ZITADEL_FQDN")" "$(get_env_val "ZITADEL_INT_FQDN")"
+printf "%-25s : %-30s | %s\n" "OPNsense" "$(get_env_val "OPNSENSE_FQDN")" "$(get_env_val "OPNSENSE_INT_FQDN")"
+printf "%-25s : %-30s | %s\n" "Guacamole" "$(get_env_val "GUACAMOLE_FQDN")" "$(get_env_val "GUACAMOLE_INT_FQDN")"
+printf "%-25s : %-30s | %s\n" "Vaultwarden" "$(get_env_val "VAULTWARDEN_FQDN")" "$(get_env_val "VAULTWARDEN_INT_FQDN")"
+printf "%-25s : %-30s | %s\n" "Portainer" "$(get_env_val "PORTAINER_FQDN")" "$(get_env_val "PORTAINER_INT_FQDN")"
+printf "%-25s : %-30s | %s\n" "Whoami" "$(get_env_val "WHOAMI_FQDN")" "$(get_env_val "WHOAMI_INT_FQDN")"
+echo -e "${BLUE}----------------------------------------------${NC}"
+printf "%-25s : %s:%s\n" "OPNsense IP Hedefi" "$(get_env_val "OPNSENSE_INTERNAL_IP")" "$(get_env_val "OPNSENSE_INTERNAL_PORT")"
+printf "%-25s : %s (%s)\n" "UCS Samba 4 Hedefi" "$(get_env_val "UCS_HOST")" "$(get_env_val "UCS_IP")"
 
 echo -e "\n${BLUE}----------------------------------------------${NC}"
 echo -e "${BLUE}           GİZLİ BİLGİ VE ŞİFRE DENETİMİ      ${NC}"
@@ -66,9 +71,9 @@ manage_secret() {
         local new_val
         new_val=$(gen_random_secret "$length")
         set_env_val "$key" "$new_val"
-        echo -e "${GREEN}    -> Yeni güvenli rastgele değer atandı.${NC}"
+        echo -e "${GREEN}    -> Yeni güçlü rastgele şifre atandı.${NC}"
     else
-        echo -e "${GREEN}[OK] ${desc} (${key}) tanımlı.${NC}"
+        echo -e "${GREEN}[OK]${desc} (${key}) tanımlı.${NC}"
         read -r -p "    -> Bu şifreyi YENİDEN üretmek ister misiniz? (e/H): " choice
         case "$choice" in
             [eE][vV][eE][tT]|[eE])
@@ -92,28 +97,28 @@ manage_secret() {
 }
 
 manage_secret "POSTGRES_PASSWORD" "PostgreSQL (Zitadel DB) Şifresi" 24 \
-    "Mevcut veritabanı volume'ü varsa (.env şifresi değiştiğinde), PostgreSQL konteyneri başlatılamaz!"
+    "Mevcut veritabanı volume'ü varken parola değişirse veritabanı erişilemez hale gelir!"
 
 manage_secret "GUACAMOLE_DB_PASSWORD" "Guacamole PostgreSQL Şifresi" 24 \
-    "Guacamole veritabanı şifresi değişirse Guacamole oturum açamaz ve veritabanı erişimi kopar!"
+    "Guacamole veritabanı parolası değiştiğinde Guacamole servisi oturum açamaz!"
 
 manage_secret "VAULTWARDEN_DB_PASSWORD" "Vaultwarden PostgreSQL Şifresi" 24 \
-    "Vaultwarden DB parolası değişirse Vaultwarden servisi veritabanına bağlanamaz!"
+    "Vaultwarden DB parolası değişirse parola kasası veritabanına bağlanamaz!"
 
 manage_secret "ZITADEL_MASTERKEY" "Zitadel Master Key (32 Karakter)" 32 \
-    "KRİTİK: Masterkey değiştiğinde Zitadel veritabanındaki mevcut kayıtları ÇÖZEMEZ. KALICI VERİ KAYBI OLUŞUR!"
+    "KRİTİK: Masterkey değiştiğinde Zitadel veritabanındaki kayıtları ÇÖZEMEZ. KALICI VERİ KAYBI OLUŞUR!"
 
 manage_secret "ZITADEL_ADMIN_PASSWORD" "Zitadel İlk Kurulum Admin Şifresi" 24 \
-    "Bu şifre yalnızca ilk kurulumda geçerlidir; mevcut veritabanı üzerinde etkisi olmaz."
+    "Bu şifre yalnızca ilk kurulumda geçerlidir; var olan veritabanı üzerinde etkisi olmaz."
 
 manage_secret "VAULTWARDEN_ADMIN_TOKEN" "Vaultwarden /admin Giriş Tokenı" 32 \
     "Vaultwarden yönetim paneli erişim anahtarı yenilenir."
 
+# Zitadel Masterkey Uzunluk Denetimi
 FINAL_MASTERKEY=$(get_env_val "ZITADEL_MASTERKEY")
 if [ -n "$FINAL_MASTERKEY" ] && [ "${#FINAL_MASTERKEY}" -ne 32 ]; then
     echo -e "\n${RED}[!] DİKKAT: ZITADEL_MASTERKEY uzunluğu ${#FINAL_MASTERKEY} karakter.${NC}"
     echo -e "${RED}Zitadel için tam 32 karakter (256-bit) zorunludur.${NC}"
-    echo -e "${RED}UYARI: Yeni anahtar üretilmesi mevcut verileri geçersiz kılabilir!${NC}"
     read -r -p "32 karakterlik yeni anahtar atansın mı? (evet/HAYIR): " mk_confirm
     if [ "$mk_confirm" = "evet" ]; then
         CORRECTED_KEY=$(gen_random_secret 32)
@@ -124,29 +129,25 @@ if [ -n "$FINAL_MASTERKEY" ] && [ "${#FINAL_MASTERKEY}" -ne 32 ]; then
     fi
 fi
 
-echo -e "\n${GREEN}==============================================${NC}"
-echo -e "${GREEN}    TÜM ŞİFRELER VE .env DOĞRULANDI           ${NC}"
-echo -e "${GREEN}==============================================${NC}"
-echo -e "Yığını başlatmak için: ${YELLOW}docker compose up -d${NC}\n"
-
-
-# -------------------------------------------------------------
-# TLS & ACME.JSON DOSYA YETKİ KONTROLÜ
-# -------------------------------------------------------------
+# Dosya ve Sertifika İzin Denetimleri
 CERTS_DIR="traefik/certs"
 ACME_FILE="${CERTS_DIR}/acme.json"
-
 mkdir -p "$CERTS_DIR"
 
 if [ ! -f "$ACME_FILE" ]; then
     touch "$ACME_FILE"
     chmod 600 "$ACME_FILE"
-    echo -e "${GREEN}[✓] traefik/certs/acme.json oluşturuldu ve 600 izni verildi.${NC}"
+    echo -e "${GREEN}[✓]${ACME_FILE} oluşturuldu ve 'chmod 600' yetkisi verildi.${NC}"
 else
     chmod 600 "$ACME_FILE"
 fi
 
-if [ ! -f "${CERTS_DIR}/ucs-root-ca.crt" ]; then
-    echo -e "${YELLOW}[!] UYARI: ${CERTS_DIR}/ucs-root-ca.crt bulunamadı!${NC}"
-    echo -e "    UCS sunucunuzdan kök sertifikayı bu konuma kopyalamayı unutmayın."
+CF_TOKEN=$(get_env_val "CF_DNS_API_TOKEN")
+if [ -z "$CF_TOKEN" ] \vert{}\vert{} [ "$CF_TOKEN" = "Buraya_Cloudflare_DNS_API_Token_Gelecek" ]; then
+    echo -e "\n${YELLOW}[!] UYARI: CF_DNS_API_TOKEN tanımlanmamış. Let's Encrypt DNS Challenge çalışmayabilir.${NC}"
 fi
+
+echo -e "\n${GREEN}==============================================${NC}"
+echo -e "${GREEN}    TÜM KONTROLLER BAŞARIYLA TAMAMLANDI       ${NC}"
+echo -e "${GREEN}==============================================${NC}"
+echo -e "Yığını başlatmak için: ${YELLOW}docker compose up -d${NC}\n"
