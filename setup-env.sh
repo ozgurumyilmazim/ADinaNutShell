@@ -210,6 +210,14 @@ chmod 644 pgadmin/servers.json
 
 echo -e "${GREEN}[✓] pgAdmin pgpass ve CrowdSec PostgreSQL ayarları hazırlandı.${NC}"
 
+# pgAdmin Desktop Mode ve Master Password Kapatma Yapılandırması
+cat <<'EOF' > pgadmin/config_local.py
+SERVER_MODE = False
+MASTER_PASSWORD_REQUIRED = False
+EOF
+
+chmod 644 pgadmin/config_local.py
+chown 5050:5050 pgadmin/config_local.py 2>/dev/null || true
 
 # CrowdSec config.yaml.local oluşturma
 cat <<'EOF' > crowdsec/config.yaml.local

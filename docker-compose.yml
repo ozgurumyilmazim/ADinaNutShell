@@ -314,14 +314,19 @@
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@sirket.intra}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
-      PGADMIN_CONFIG_SERVER_MODE: "True"
+      # Giriş ekranını (e-posta/şifre) tamamen kaldırır:
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      # Master password penceresini tamamen devre dışı bırakır:
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      # servers.json dosyasındaki güncellemelerin her başlangıçta işlenmesini sağlar:
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
       PGADMIN_SERVER_JSON_FILE: "/pgadmin4/servers.json"
       PGPASSFILE: "/pgadmin4/pgpass"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
       - ./pgadmin/pgpass:/pgadmin4/pgpass:ro
+      - ./pgadmin/config_local.py:/pgadmin4/config_local.py:ro
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     labels:
       - "traefik.enable=true"
