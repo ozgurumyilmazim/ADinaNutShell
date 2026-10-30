@@ -1,44 +1,44 @@
 {
-    "Servers": {
-        "1": {
-            "Name": "PostgreSQL (Merkezi Kümeler - Tum DB'ler)",
-            "Group": "Sirket Altyapi",
-            "Port": 5432,
-            "Username": "zitadel",
-            "Host": "db",
-            "SSLMode": "prefer",
-            "MaintenanceDB": "zitadel",
-            "PassFile": "/pgadmin4/pgpass"
-        },
-        "2": {
-            "Name": "Guacamole Veritabani",
-            "Group": "Servis Veritabanlari",
-            "Port": 5432,
-            "Username": "guacamole",
-            "Host": "db",
-            "SSLMode": "prefer",
-            "MaintenanceDB": "guacamole_db",
-            "PassFile": "/pgadmin4/pgpass"
-        },
-        "3": {
-            "Name": "Vaultwarden Veritabani",
-            "Group": "Servis Veritabanlari",
-            "Port": 5432,
-            "Username": "vaultwarden",
-            "Host": "db",
-            "SSLMode": "prefer",
-            "MaintenanceDB": "vaultwarden_db",
-            "PassFile": "/pgadmin4/pgpass"
-        },
-        "4": {
-            "Name": "CrowdSec Veritabani",
-            "Group": "Servis Veritabanlari",
-            "Port": 5432,
-            "Username": "crowdsec",
-            "Host": "db",
-            "SSLMode": "prefer",
-            "MaintenanceDB": "crowdsec_db",
-            "PassFile": "/pgadmin4/pgpass"
-        }
+  "Servers": {
+    "1": {
+      "Name": "PostgreSQL (Merkezi Kümeler - Tum DB'ler)",
+      "Group": "Sirket Altyapi",
+      "Port": 5432,
+      "Username": "zitadel",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "zitadel",
+      "PassFile": "/pgadmin4/pgpass"
+    },
+    "2": {
+      "Name": "Guacamole Veritabani",
+      "Group": "Servis Veritabanlari",
+      "Port": 5432,
+      "Username": "guacamole",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "guacamole_db",
+      "PassFile": "/pgadmin4/pgpass"
+    },
+    "3": {
+      "Name": "Vaultwarden Veritabani",
+      "Group": "Servis Veritabanlari",
+      "Port": 5432,
+      "Username": "vaultwarden",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "vaultwarden_db",
+      "PassFile": "/pgadmin4/pgpass"
+    },
+    "4": {
+      "Name": "CrowdSec Veritabani",
+      "Group": "Servis Veritabanlari",
+      "Port": 5432,
+      "Username": "crowdsec",
+      "Host": "db",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "crowdsec_db",
+      "PassFile": "/pgadmin4/pgpass"
     }
+  }
 }
