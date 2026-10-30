@@ -101,6 +101,27 @@ if [ -z "$current_subnet" ]; then
     set_env_val "TRUSTED_SUBNET" "172.16.1.0/24"
 fi
 
+# -------------------------------------------------------------
+# CROWDSEC TRAEFIK LOCAL PLUGIN KONTROLÜ VE İNDİRİLMESİ
+# -------------------------------------------------------------
+PLUGIN_DIR="traefik/plugins-local/src/github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+
+if [ ! -f "${PLUGIN_DIR}/.traefik.yml" ]; then
+    echo -e "${YELLOW}[!] CrowdSec Traefik Bouncer eklentisi eksik, indiriliyor...${NC}"
+    mkdir -p "${PLUGIN_DIR}"
+    
+    if curl -fsSL https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/archive/refs/tags/v1.4.1.tar.gz | \
+       tar -xz --strip-components=1 -C "${PLUGIN_DIR}"; then
+        chmod -R 755 traefik/plugins-local
+        echo -e "${GREEN}[✓] CrowdSec Traefik eklentisi başarıyla kuruldu.${NC}"
+    else
+        echo -e "${RED}[X] Eklenti indirilemedi! İnternet bağlantınızı kontrol edin.${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}[✓] CrowdSec Traefik eklentisi mevcut.${NC}"
+fi
+
 manage_secret "POSTGRES_PASSWORD" "PostgreSQL (Zitadel DB) Şifresi" 24 \
     "Mevcut veritabanı volume'ü varsa PostgreSQL konteyneri şifre uyuşmazlığı nedeniyle başlatılamaz!"
 
