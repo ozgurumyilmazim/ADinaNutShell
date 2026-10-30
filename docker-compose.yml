@@ -121,7 +121,7 @@
       - "traefik.http.routers.zitadel-int.entrypoints=websecure"
       - "traefik.http.routers.zitadel-int.tls=true"
       - "traefik.http.routers.zitadel-int.service=zitadel-svc"
-      # Router 2: Harici (.com.tr -> 444 + CrowdSec Koruması)
+      # Zitadel Harici Router (444 -> 8080 h2c)
       - "traefik.http.routers.zitadel-ext.rule=Host(`${ZITADEL_EXT_FQDN}`)"
       - "traefik.http.routers.zitadel-ext.entrypoints=webexternal"
       - "traefik.http.routers.zitadel-ext.tls=true"
