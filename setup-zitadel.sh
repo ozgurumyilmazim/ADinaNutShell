@@ -26,35 +26,42 @@ PG_DB=$(get_env_val "POSTGRES_DB")
 DOMAIN_INT=$(get_env_val "DOMAIN_INT")
 DOMAIN_EXT=$(get_env_val "DOMAIN_EXT")
 
-ZITADEL_INT_FQDN=$(get_env_val "ZITADEL_INT_FQDN")
-ZITADEL_INT_FQDN=${ZITADEL_INT_FQDN:-auth.${DOMAIN_INT}}
+# Ham FQDN değerlerini al ve ${DOMAIN_...} değişkenlerini çöz
+ZITADEL_INT_RAW=$(get_env_val "ZITADEL_INT_FQDN")
+ZITADEL_INT_RAW="${ZITADEL_INT_RAW//\$\{DOMAIN_INT\}/$DOMAIN_INT}"
+ZITADEL_INT_FQDN="${ZITADEL_INT_RAW:-auth.${DOMAIN_INT}}"
 
-ZITADEL_EXT_FQDN=$(get_env_val "ZITADEL_EXT_FQDN")
-ZITADEL_EXT_FQDN=${ZITADEL_EXT_FQDN:-auth.${DOMAIN_EXT}}
+ZITADEL_EXT_RAW=$(get_env_val "ZITADEL_EXT_FQDN")
+ZITADEL_EXT_RAW="${ZITADEL_EXT_RAW//\$\{DOMAIN_EXT\}/$DOMAIN_EXT}"
+ZITADEL_EXT_FQDN="${ZITADEL_EXT_RAW:-auth.${DOMAIN_EXT}}"
+
+echo -e "Dahili FQDN : ${BLUE}${ZITADEL_INT_FQDN}${NC}"
+echo -e "Harici FQDN : ${BLUE}${ZITADEL_EXT_FQDN}${NC}\n"
 
 if [ "$ZITADEL_INT_FQDN" == "$ZITADEL_EXT_FQDN" ]; then
-    echo -e "${GREEN}[✓] Dahili ve harici FQDN aynı (${ZITADEL_INT_FQDN}), ek alan adı tanımlamaya gerek yok.${NC}"
+    echo -e "${GREEN}[✓] Dahili ve harici FQDN aynı (${ZITADEL_INT_FQDN}), ekleme gerekmiyor.${NC}"
     exit 0
 fi
 
-# 1. Zitadel'in varsayılan Instance kaydını (auth.icat.intra) tabloya yazmasını bekle
+# 1. Zitadel Instance kaydının veritabanına oturmasını bekle
 echo -e "${YELLOW}[1/3] Zitadel Instance ilklendirmesi bekleniyor...${NC}"
 RETRIES=40
 INSTANCE_ID=""
 
 until [ -n "$INSTANCE_ID" ] || [ $RETRIES -eq 0 ]; do
+    # Alan adına takılmaksızın oluşturulan ilk geçerli instance_id'yi yakalar
     INSTANCE_ID=$(docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" -tAc \
-        "SELECT instance_id FROM projections.instance_domains WHERE domain = '${ZITADEL_INT_FQDN}' LIMIT 1;" 2>/dev/null || true)
+        "SELECT instance_id FROM projections.instance_domains ORDER BY creation_date ASC LIMIT 1;" 2>/dev/null || true)
     
     if [ -z "$INSTANCE_ID" ]; then
-        echo -e "    -> Instance ID ve ${ZITADEL_INT_FQDN} bekleniyor (${RETRIES} deneme kaldı)..."
+        echo -e "    -> Zitadel şema ve ilk instance bekleniyor (${RETRIES} deneme kaldı)..."
         sleep 3
         RETRIES=$((RETRIES-1))
     fi
 done
 
 if [ -z "$INSTANCE_ID" ]; then
-    echo -e "${RED}[X] Zitadel zaman aşımına uğradı veya instance oluşturulamadı. Logları inceleyin:${NC}"
+    echo -e "${RED}[X] Zitadel instance oluşturulamadı. Logları kontrol edin:${NC}"
     docker compose logs zitadel --tail 50
     exit 1
 fi
@@ -73,10 +80,10 @@ if [ "$ALREADY_EXISTS" != "1" ]; then
     VALUES ('${INSTANCE_ID}', '${ZITADEL_EXT_FQDN}', false, false, NOW(), NOW())
     ON CONFLICT (instance_id, domain) DO NOTHING;
 EOSQL
-    echo -e "${GREEN}[✓] Harici alan adı veritabanına başarıyla eklendi.${NC}"
+    echo -e "${GREEN}[✓] ${ZITADEL_EXT_FQDN} veritabanına başarıyla eklendi.${NC}"
 
     # 3. In-memory router önbelleğini yenile
-    echo -e "${YELLOW}[3/3] Zitadel yönlendirme tablosu güncelleniyor...${NC}"
+    echo -e "${YELLOW}[3/3] Zitadel yönlendirme tablosu güncelleniyor (restart)...${NC}"
     docker compose restart zitadel >/dev/null 2>&1
     echo -e "${GREEN}[✓] Zitadel yeniden başlatıldı.${NC}"
 else
