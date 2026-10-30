@@ -48,6 +48,7 @@ printf "%-25s : %s | %s\n" "WHOAMI FQDN" "$(get_env_val "WHOAMI_INT_FQDN")" "$(g
 printf "%-25s : %s:%s\n" "OPNSENSE_TARGET" "$(get_env_val "OPNSENSE_INTERNAL_IP")" "$(get_env_val "OPNSENSE_INTERNAL_PORT")"
 printf "%-25s : %s (%s)\n" "UCS_AD_TARGET" "$(get_env_val "UCS_HOST")" "$(get_env_val "UCS_IP")"
 printf "%-25s : %s | %s\n" "PGADMIN FQDN" "$(get_env_val "PGADMIN_INT_FQDN")" "$(get_env_val "PGADMIN_EXT_FQDN")"
+printf "%-25s : %s\n" "TRUSTED SUBNET (CIDR)" "$(get_env_val "TRUSTED_SUBNET") (127.0.0.1/32 ile)"
 
 echo -e "\n${BLUE}----------------------------------------------${NC}"
 echo -e "${BLUE}           GİZLİ BİLGİ VE ŞİFRE DENETİMİ      ${NC}"
@@ -90,6 +91,15 @@ manage_secret() {
         esac
     fi
 }
+
+# -------------------------------------------------------------
+# AĞ YAPILANDIRMASI KONTROLÜ
+# -------------------------------------------------------------
+current_subnet=$(get_env_val "TRUSTED_SUBNET")
+if [ -z "$current_subnet" ]; then
+    echo -e "${YELLOW}[!] TRUSTED_SUBNET tanımlı değil, varsayılan (172.16.1.0/24) atanıyor...${NC}"
+    set_env_val "TRUSTED_SUBNET" "172.16.1.0/24"
+fi
 
 manage_secret "POSTGRES_PASSWORD" "PostgreSQL (Zitadel DB) Şifresi" 24 \
     "Mevcut veritabanı volume'ü varsa PostgreSQL konteyneri şifre uyuşmazlığı nedeniyle başlatılamaz!"
