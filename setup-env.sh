@@ -216,6 +216,7 @@ echo -e "${GREEN}[✓] pgAdmin sunucu listesi 4 veritabanıyla güncellendi (pga
 
 # pgpass dosyasını oluştur (hostname:port:database:username:password)
 PGPASS_FILE="pgadmin/pgpass"
+rm -f "$PGPASS_FILE" 2>/dev/null || sudo rm -f "$PGPASS_FILE" 2>/dev/null || true
 cat <<EOF > "$PGPASS_FILE"
 db:5432:*:${PG_USER}:${PG_PASS}
 db:5432:*:${GUAC_USER}:${GUAC_PASS}
@@ -225,11 +226,18 @@ EOF
 
 # libpq zorunlu izinleri (0600 ve UID 5050)
 chmod 600 "$PGPASS_FILE"
-chown 5050:5050 "$PGPASS_FILE" 2>/dev/null || sudo chown 5050:5050 "$PGPASS_FILE" 2>/dev/null || true
+chown 5050:5050 "$PGPASS_FILE" 2>/dev/null || \
+sudo chown 5050:5050 "$PGPASS_FILE" 2>/dev/null || \
+docker run --rm -v "$(pwd)/pgadmin:/target" alpine chown 5050:5050 /target/pgpass 2>/dev/null || true
 chmod 644 pgadmin/servers.json
 
 echo -e "${GREEN}[✓] pgAdmin pgpass ve CrowdSec PostgreSQL ayarları hazırlandı.${NC}"
 
+# -------------------------------------------------------------
+# PGADMIN CONFIG_LOCAL (DESKTOP MODE)
+# -------------------------------------------------------------
+# 5050 sahipliği gerektirmez; 644 izni pgAdmin'in okuması için yeterlidir
+rm -f pgadmin/config_local.py
 # pgAdmin Desktop Mode ve Master Password Kapatma Yapılandırması
 cat <<'EOF' > pgadmin/config_local.py
 SERVER_MODE = False
