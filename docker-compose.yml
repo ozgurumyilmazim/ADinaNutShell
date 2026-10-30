@@ -135,6 +135,42 @@
       - internal_network
 
   # ==========================================
+  # 3.1 ZITADEL LOGIN V2 UI (NEXT.JS)
+  # ==========================================
+  zitadel-login:
+    image: ghcr.io/zitadel/zitadel-login:latest
+    container_name: zitadel-login
+    restart: unless-stopped
+    depends_on:
+      - zitadel
+    environment:
+      ZITADEL_API_URL: http://zitadel:8080
+      ZITADEL_SESSION_COOKIE_SECRET: ${ZITADEL_SESSION_COOKIE_SECRET}
+    volumes:
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    labels:
+      - "traefik.enable=true"
+      # Dahili Router: /ui/v2/login önceliği
+      - "traefik.http.routers.zitadel-login-int.rule=Host(`${ZITADEL_INT_FQDN}`) && PathPrefix(`/ui/v2/login`)"
+      - "traefik.http.routers.zitadel-login-int.entrypoints=websecure"
+      - "traefik.http.routers.zitadel-login-int.tls=true"
+      - "traefik.http.routers.zitadel-login-int.priority=100"
+      - "traefik.http.routers.zitadel-login-int.service=zitadel-login-svc"
+
+      # Harici Router: /ui/v2/login önceliği + CrowdSec
+      - "traefik.http.routers.zitadel-login-ext.rule=Host(`${ZITADEL_EXT_FQDN}`) && PathPrefix(`/ui/v2/login`)"
+      - "traefik.http.routers.zitadel-login-ext.entrypoints=webexternal"
+      - "traefik.http.routers.zitadel-login-ext.tls=true"
+      - "traefik.http.routers.zitadel-login-ext.middlewares=crowdsec@file"
+      - "traefik.http.routers.zitadel-login-ext.priority=100"
+      - "traefik.http.routers.zitadel-login-ext.service=zitadel-login-svc"
+
+      # Servis Portu
+      - "traefik.http.services.zitadel-login-svc.loadbalancer.server.port=3000"
+    networks:
+      - edge_network
+      - internal_network
+  # ==========================================
   # 4. KONTEYNER YÖNETİMİ: PORTAINER CE
   # ==========================================
   portainer:

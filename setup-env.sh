@@ -166,6 +166,9 @@ manage_secret "ZITADEL_MASTERKEY" "Zitadel Master Key (32 Karakter)" 32 \
 manage_secret "ZITADEL_ADMIN_PASSWORD" "Zitadel İlk Kurulum Admin Şifresi" 24 \
     "Yalnızca ilk kurulumda kullanılır; mevcut veritabanını etkilemez."
 
+manage_secret "ZITADEL_SESSION_COOKIE_SECRET" "Zitadel Login UI Cookie Secret (32 Karakter)" 32 \
+    "Zitadel Login oturum çerezlerini imzalamak için kullanılır."
+
 manage_secret "VAULTWARDEN_ADMIN_TOKEN" "Vaultwarden /admin Giriş Tokenı" 32 \
     "Vaultwarden yönetim paneli erişim anahtarı yenilenir."
 
