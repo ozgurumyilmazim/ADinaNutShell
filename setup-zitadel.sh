@@ -23,8 +23,6 @@ get_env_val() {
 
 PG_USER=$(get_env_val "POSTGRES_USER")
 PG_DB=$(get_env_val "POSTGRES_DB")
-
-# FQDN ve Domain çözümlemesi
 DOMAIN_INT=$(get_env_val "DOMAIN_INT")
 DOMAIN_EXT=$(get_env_val "DOMAIN_EXT")
 
@@ -39,43 +37,48 @@ if [ "$ZITADEL_INT_FQDN" == "$ZITADEL_EXT_FQDN" ]; then
     exit 0
 fi
 
-# 1. Zitadel DB Tablolarının Hazır Olmasını Bekle
-echo -e "${YELLOW}[1/3] Zitadel veritabanı şeması ve Instance kaydı bekleniyor...${NC}"
-RETRIES=30
-until docker exec db psql -U "${PG_USER}" -d "${PG_DB}" -tAc \
-    "SELECT 1 FROM information_schema.tables WHERE table_schema='projections' AND table_name='instance_domains';" 2>/dev/null | grep -q 1 || [ $RETRIES -eq 0 ]; do
-    echo -e "    -> Projeksiyon tabloları bekleniyor (${RETRIES} deneme kaldı)..."
-    sleep 3
-    RETRIES=$((RETRIES-1))
+# 1. Zitadel'in varsayılan Instance kaydını (auth.icat.intra) tabloya yazmasını bekle
+echo -e "${YELLOW}[1/3] Zitadel Instance ilklendirmesi bekleniyor...${NC}"
+RETRIES=40
+INSTANCE_ID=""
+
+until [ -n "$INSTANCE_ID" ] || [ $RETRIES -eq 0 ]; do
+    INSTANCE_ID=$(docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" -tAc \
+        "SELECT instance_id FROM projections.instance_domains WHERE domain = '${ZITADEL_INT_FQDN}' LIMIT 1;" 2>/dev/null || true)
+    
+    if [ -z "$INSTANCE_ID" ]; then
+        echo -e "    -> Instance ID ve ${ZITADEL_INT_FQDN} bekleniyor (${RETRIES} deneme kaldı)..."
+        sleep 3
+        RETRIES=$((RETRIES-1))
+    fi
 done
 
-if [ $RETRIES -eq 0 ]; then
-    echo -e "${RED}[X] Zitadel henüz veritabanı şemasını kuramadı. Zitadel loglarını inceleyin:${NC}"
+if [ -z "$INSTANCE_ID" ]; then
+    echo -e "${RED}[X] Zitadel zaman aşımına uğradı veya instance oluşturulamadı. Logları inceleyin:${NC}"
     docker compose logs zitadel --tail 50
     exit 1
 fi
 
-# 2. Harici Alan Adını Projeksiyon Tablosuna Eşle
-echo -e "${YELLOW}[2/3] Harici alan adı (${ZITADEL_EXT_FQDN}) Zitadel Instance'ına bağlanıyor...${NC}"
+echo -e "${GREEN}[✓] Zitadel Instance bulundu: ${INSTANCE_ID}${NC}"
+
+# 2. Harici Alan Adını Ekle
+echo -e "${YELLOW}[2/3] Harici alan adı (${ZITADEL_EXT_FQDN}) Instance'a bağlanıyor...${NC}"
 
 ALREADY_EXISTS=$(docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" -tAc \
-    "SELECT 1 FROM projections.instance_domains WHERE domain = '${ZITADEL_EXT_FQDN}';" 2>/dev/null || true)
+    "SELECT 1 FROM projections.instance_domains WHERE domain = '${ZITADEL_EXT_FQDN}' AND instance_id = '${INSTANCE_ID}';" 2>/dev/null || true)
 
 if [ "$ALREADY_EXISTS" != "1" ]; then
     docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" <<EOSQL
-    -- Dahili alan adının bağlı olduğu instance_id değerini alarak harici adresi ekle
     INSERT INTO projections.instance_domains (instance_id, domain, is_generated, is_primary, creation_date, change_date)
-    SELECT instance_id, '${ZITADEL_EXT_FQDN}', false, false, NOW(), NOW()
-    FROM projections.instance_domains
-    WHERE domain = '${ZITADEL_INT_FQDN}'
+    VALUES ('${INSTANCE_ID}', '${ZITADEL_EXT_FQDN}', false, false, NOW(), NOW())
     ON CONFLICT (instance_id, domain) DO NOTHING;
 EOSQL
-    echo -e "${GREEN}[✓] Harici alan adı veritabanına başarıyla kaydedildi.${NC}"
-    
-    # 3. Zitadel'in In-Memory Instance Router Önbelleğini Yenile
-    echo -e "${YELLOW}[3/3] Zitadel yönlendirme tablosu yenileniyor...${NC}"
+    echo -e "${GREEN}[✓] Harici alan adı veritabanına başarıyla eklendi.${NC}"
+
+    # 3. In-memory router önbelleğini yenile
+    echo -e "${YELLOW}[3/3] Zitadel yönlendirme tablosu güncelleniyor...${NC}"
     docker compose restart zitadel >/dev/null 2>&1
-    echo -e "${GREEN}[✓] Zitadel yeniden başlatıldı. Yeni alan adı artık aktif!${NC}"
+    echo -e "${GREEN}[✓] Zitadel yeniden başlatıldı.${NC}"
 else
     echo -e "${GREEN}[✓] ${ZITADEL_EXT_FQDN} alan adı zaten kayıtlı, işlem atlandı.${NC}"
 fi
