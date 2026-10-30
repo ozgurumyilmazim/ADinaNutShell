@@ -112,8 +112,14 @@
       # Login V2'yi kapatıp dahili Login V1 arayüzünü etkinleştirir:
       ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "false"
       ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ZITADEL_ORG_NAME}
-      ZITADEL_FIRSTINSTANCE_USER_USERNAME: ${ZITADEL_ADMIN_USER}
-      ZITADEL_FIRSTINSTANCE_USER_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
+      # ZITADEL_FIRSTINSTANCE_USER_USERNAME: ${ZITADEL_ADMIN_USER}
+      # ZITADEL_FIRSTINSTANCE_USER_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
+      # YENİ (Zitadel v4 Standartı):
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: ${ZITADEL_ADMIN_USER}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_ADMIN_PASSWORD}
+      # İlk girişte zorunlu şifre değişimini atlamak isterseniz (isteğe bağlı):
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+
     volumes:
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     labels:
