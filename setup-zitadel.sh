@@ -76,8 +76,11 @@ ALREADY_EXISTS=$(docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" -tAc \
 
 if [ "$ALREADY_EXISTS" != "1" ]; then
     docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" <<EOSQL
-    INSERT INTO projections.instance_domains (instance_id, domain, is_generated, is_primary, creation_date, change_date)
-    VALUES ('${INSTANCE_ID}', '${ZITADEL_EXT_FQDN}', false, false, NOW(), NOW())
+    INSERT INTO projections.instance_domains (instance_id, domain, is_generated, is_primary, creation_date, change_date, sequence)
+    SELECT instance_id, '${ZITADEL_EXT_FQDN}', false, false, NOW(), NOW(), sequence
+    FROM projections.instance_domains
+    WHERE instance_id = '${INSTANCE_ID}'
+    LIMIT 1
     ON CONFLICT (instance_id, domain) DO NOTHING;
 EOSQL
     echo -e "${GREEN}[✓] ${ZITADEL_EXT_FQDN} veritabanına başarıyla eklendi.${NC}"
