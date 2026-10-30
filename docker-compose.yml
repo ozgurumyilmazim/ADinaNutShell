@@ -374,8 +374,12 @@
       - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
       - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED:-false}
       - INVITATIONS_ALLOWED=true
+      - INVITATION_ORG_NAME=${INVITATION_ORG_NAME}
+      - EMERGENCY_ACCESS_ALLOWED=${EMERGENCY_ACCESS_ALLOWED}
       - WEBSOCKET_ENABLED=true
       - DATABASE_URL=postgresql://${VAULTWARDEN_DB_USER}:${VAULTWARDEN_DB_PASSWORD}@db:5432/${VAULTWARDEN_DB_NAME}
+      - TZ=${TZ}
+
     volumes:
       - vaultwarden_data:/data
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
