@@ -12,7 +12,7 @@ http:
       entryPoints:
         - "webexternal"
       middlewares:
-        - "crowdsec@docker"
+        - "crowdsec@file"
       service: "opnsense-service"
       tls: {}
 
