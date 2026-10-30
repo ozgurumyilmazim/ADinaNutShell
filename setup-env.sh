@@ -124,16 +124,17 @@ current_vw_token=$(get_env_val "VAULTWARDEN_ADMIN_TOKEN")
 if [ -z "$current_vw_token" ] || [[ "$current_vw_token" != *"argon2"* ]]; then
     echo -e "${YELLOW}[!] Vaultwarden Admin Token için Argon2 PHC hash üretiliyor...${NC}"
     RAW_VW_PASS=$(gen_random_secret 24)
-
-    # Vaultwarden imajı üzerinden hash üret
-    HASHED_TOKEN=$(docker run --rm vaultwarden/server:latest /vaultwarden hash <<< "$RAW_VW_PASS" | tail -n 1 | tr -d '\r\n')
-
-    # Docker Compose için $ işaretlerini çiftle ($ -> $$)
+    SALT=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16)
+    
+    # TTY gerektirmez, doğrudan stdin üzerinden standart PHC üretir (~40KB paket)
+    HASHED_TOKEN=$(docker run --rm -i alpine:latest sh -c \
+        "apk add --no-cache -q argon2 >/dev/null && echo -n '$RAW_VW_PASS' | argon2 '$SALT' -id -e -t 3 -m 16 -p 4 -l 32" | tr -d '\r\n')
+    
     ESCAPED_TOKEN="${HASHED_TOKEN//\$/\$\$}"
     set_env_val "VAULTWARDEN_ADMIN_TOKEN" "'$ESCAPED_TOKEN'"
-
+    
     echo -e "${GREEN}[✓] Vaultwarden Argon2 Admin Token üretildi.${NC}"
-    echo -e "${YELLOW}    -> Geçici Admin Parolanız (Arayüzde girmek için): ${BOLD}${RAW_VW_PASS}${NC}"
+    echo -e "${YELLOW}    -> Üretilen Admin Parolası: ${BOLD}${RAW_VW_PASS}${NC}"
 fi
 
 
