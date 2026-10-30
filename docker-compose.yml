@@ -93,7 +93,7 @@
     depends_on:
       db:
         condition: service_healthy
-    command: 'start-from-init --masterkey "${ZITADEL_MASTERKEY}"'
+    command: 'start-from-init --masterkey "${ZITADEL_MASTERKEY}" --tlsMode external'
     environment:
       ZITADEL_DATABASE_POSTGRES_HOST: db
       ZITADEL_DATABASE_POSTGRES_PORT: 5432
