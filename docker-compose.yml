@@ -234,6 +234,8 @@
       - tailscale_data:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    devices:
+      - /dev/net/tun:/dev/net/tun
     cap_add:
       - NET_ADMIN
       - NET_RAW
