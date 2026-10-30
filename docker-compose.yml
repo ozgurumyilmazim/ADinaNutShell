@@ -170,6 +170,7 @@
     networks:
       - edge_network
       - internal_network
+
   # ==========================================
   # 4. KONTEYNER YÖNETİMİ: PORTAINER CE
   # ==========================================
