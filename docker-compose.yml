@@ -328,9 +328,9 @@
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@sirket.intra}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       # Giriş ekranını (e-posta/şifre) tamamen kaldırır:
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-      # Master password penceresini tamamen devre dışı bırakır:
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+      # false ise Master password penceresini tamamen devre dışı bırakır:
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "True"
       # servers.json dosyasındaki güncellemelerin her başlangıçta işlenmesini sağlar:
       PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
       PGADMIN_SERVER_JSON_FILE: "/pgadmin4/servers.json"
