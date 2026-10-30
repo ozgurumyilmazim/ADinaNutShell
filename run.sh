@@ -17,7 +17,7 @@ if [ ! -f ./setup-env.sh ]; then
     echo -e "${RED}[X] ./setup-env.sh betiği bulunamadı!${NC}"
     exit 1
 fi
-echo -e "\n${YELLOW}[ADIM 1/3] Ortam değişkenleri ve yapılandırma dosyaları kontrol ediliyor...${NC}"
+echo -e "\n${YELLOW}[ADIM 1/4] Ortam değişkenleri ve yapılandırma dosyaları kontrol ediliyor...${NC}"
 chmod +x ./setup-env.sh
 ./setup-env.sh
 
@@ -26,16 +26,22 @@ if [ ! -f ./setup-db.sh ]; then
     echo -e "${RED}[X] ./setup-db.sh betiği bulunamadı!${NC}"
     exit 1
 fi
-echo -e "\n${YELLOW}[ADIM 2/3] Veritabanı hazır hale getiriliyor...${NC}"
+echo -e "\n${YELLOW}[ADIM 2/4] Merkezi veritabanı ve servis kullanıcıları hazırlanıyor...${NC}"
 chmod +x ./setup-db.sh
 ./setup-db.sh
 
 # 3. Tüm Yığını Başlat
-echo -e "\n${YELLOW}[ADIM 3/3] Servis yığını devreye alınıyor...${NC}"
+echo -e "\n${YELLOW}[ADIM 3/4] Servis yığını devreye alınıyor...${NC}"
 docker compose up -d
 
-echo -e "\n${GREEN}[✓] Tüm servisler başlatıldı. Servis durumları:${NC}\n"
+# 4. Zitadel Harici Alan Adı Senkronizasyonu
+echo -e "\n${YELLOW}[ADIM 4/4] Zitadel alan adı entegrasyonu tamamlanıyor...${NC}"
+chmod +x ./setup-zitadel.sh
+./setup-zitadel.sh
+
+echo -e "\n${GREEN}[✓] Tüm servisler ve alan adları başarıyla devreye alındı.${NC}\n"
 docker compose ps
+
 
 echo -e "\n${BLUE}==============================================${NC}"
 echo -e "${BLUE}  Sistem aktif! Traefik logları izleniyor...  ${NC}"
