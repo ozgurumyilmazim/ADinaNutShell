@@ -74,8 +74,9 @@ echo -e "${YELLOW}[2/3] Harici alan adı (${ZITADEL_EXT_FQDN}) Instance'a bağla
 ALREADY_EXISTS=$(docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" -tAc \
     "SELECT 1 FROM projections.instance_domains WHERE domain = '${ZITADEL_EXT_FQDN}' AND instance_id = '${INSTANCE_ID}';" 2>/dev/null || true)
 
+# setup-zitadel.sh içerisindeki [2/3] Harici Alan Adını Ekle bloğu:
 if [ "$ALREADY_EXISTS" != "1" ]; then
-    docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" <<EOSQL
+    docker exec -i db psql -U "${PG_USER}" -d "${PG_DB}" -v ON_ERROR_STOP=1 <<EOSQL
     INSERT INTO projections.instance_domains (instance_id, domain, is_generated, is_primary, creation_date, change_date, sequence)
     SELECT instance_id, '${ZITADEL_EXT_FQDN}', false, false, NOW(), NOW(), sequence
     FROM projections.instance_domains
