@@ -117,7 +117,26 @@ manage_secret "PGADMIN_DEFAULT_PASSWORD" "pgAdmin 4 Giriş Parolası" 24 \
 
 manage_secret "CROWDSEC_DB_PASSWORD" "CrowdSec PostgreSQL Şifresi" 24 \
     "CrowdSec veritabanı parolası değişirse CrowdSec LAPI PostgreSQL'e erişemez!"
-    
+
+
+current_vw_token=$(get_env_val "VAULTWARDEN_ADMIN_TOKEN")
+
+if [ -z "$current_vw_token" ] || [[ "$current_vw_token" != *"argon2"* ]]; then
+    echo -e "${YELLOW}[!] Vaultwarden Admin Token için Argon2 PHC hash üretiliyor...${NC}"
+    RAW_VW_PASS=$(gen_random_secret 24)
+
+    # Vaultwarden imajı üzerinden hash üret
+    HASHED_TOKEN=$(docker run --rm vaultwarden/server:latest /vaultwarden hash <<< "$RAW_VW_PASS" | tail -n 1 | tr -d '\r\n')
+
+    # Docker Compose için $ işaretlerini çiftle ($ -> $$)
+    ESCAPED_TOKEN="${HASHED_TOKEN//\$/\$\$}"
+    set_env_val "VAULTWARDEN_ADMIN_TOKEN" "'$ESCAPED_TOKEN'"
+
+    echo -e "${GREEN}[✓] Vaultwarden Argon2 Admin Token üretildi.${NC}"
+    echo -e "${YELLOW}    -> Geçici Admin Parolanız (Arayüzde girmek için): ${BOLD}${RAW_VW_PASS}${NC}"
+fi
+
+
 # -------------------------------------------------------------
 # PGADMIN OTOMATIK SUNUCU TANIMLARI (servers.json)
 # -------------------------------------------------------------

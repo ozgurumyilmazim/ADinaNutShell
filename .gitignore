@@ -1,4 +1,4 @@
-# Çevre değişkenleri ve gizli anahtarlar
+ Çevre değişkenleri ve gizli anahtarlar
 .env
 .env.local
 *.env
@@ -26,3 +26,12 @@ Thumbs.db
 
 # pgAdmin otomatik parola dosyası
 pgadmin/pgpass
+pgadmin/servers.json
+pgadmin/config_local.py
+
+# Crowdsec
+crowdsec/config.yaml.local
+
+# Traefik
+traefik/plugins-local/
+traefik/dynamic/usersfile
