@@ -223,11 +223,11 @@
       - "traefik.http.routers.portainer-ext.rule=Host(`${PORTAINER_EXT_FQDN}`)"
       - "traefik.http.routers.portainer-ext.entrypoints=webexternal"
       - "traefik.http.routers.portainer-ext.tls=true"
+      - "traefik.http.routers.portainer-ext.middlewares=zitadel-signin@file,zitadel-forwardauth@file"
       - "traefik.http.routers.portainer-ext.middlewares=crowdsec@file"
       - "traefik.http.routers.portainer-ext.service=portainer-svc"
       # Ortak WebGUI Servisi
       - "traefik.http.services.portainer-svc.loadbalancer.server.port=9000"
-      - "traefik.http.routers.portainer-ext.middlewares=zitadel-auth"
     networks:
       - edge_network
 

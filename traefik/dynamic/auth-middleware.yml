@@ -1,0 +1,26 @@
+http:
+  middlewares:
+    # 1. Oturum Kontrolü (Varsa geçirir, yoksa 401 döner)
+    zitadel-forwardauth:
+      forwardAuth:
+        address: "http://oauth2-proxy:4180/oauth2/auth"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-Auth-Request-User"
+          - "X-Auth-Request-Email"
+          - "X-Auth-Request-Preferred-Username"
+          - "Set-Cookie"
+
+    # 2. 401 Yakalayıcı (401 geldiğinde kullanıcıyı Zitadel OIDC akışına fırlatır)
+    zitadel-signin:
+      errors:
+        status:
+          - "401-403"
+        service: "oauth2-proxy-svc"
+        query: "/oauth2/start?rd={url}"
+
+  services:
+    oauth2-proxy-svc:
+      loadBalancer:
+        servers:
+          - url: "http://oauth2-proxy:4180"

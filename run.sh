@@ -44,9 +44,11 @@ echo -e "\n${YELLOW}[ADIM 4/4] Zitadel alan adı entegrasyonu tamamlanıyor...${
 chmod +x ./setup-zitadel.sh
 ./setup-zitadel.sh
 
-DYNAMIC_DIR="./config/traefik/dynamic"
-if [ -f "$DYNAMIC_DIR/dashboard.yml.tmpl" ]; then
-    envsubst '${DOMAIN_EXT} ${DOMAIN_INT}' < "$DYNAMIC_DIR/dashboard.yml.tmpl" > "$DYNAMIC_DIR/dashboard.yml"
+DYNAMIC_DIR="./traefik/dynamic"
+TEMPLAT_DIR="./traefik/templates"
+
+if [ -f "$TEMPLAT_DIR/dashboard.yml.tmpl" ]; then
+    envsubst '${DOMAIN_EXT} ${DOMAIN_INT}' < "$TEMPLAT_DIR/dashboard.yml.tmpl" > "$DYNAMIC_DIR/dashboard.yml"
 fi
 
 
