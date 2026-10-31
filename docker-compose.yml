@@ -202,7 +202,7 @@
       - "traefik.http.routers.portainer-ext.service=portainer-svc"
       # Ortak WebGUI Servisi
       - "traefik.http.services.portainer-svc.loadbalancer.server.port=9000"
-      - "traefik.http.routers.portainer.middlewares=zitadel-auth"
+      - "traefik.http.routers.portainer-ext.middlewares=zitadel-auth"
     networks:
       - edge_network
 
