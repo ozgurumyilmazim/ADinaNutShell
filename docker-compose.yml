@@ -8,6 +8,7 @@
     restart: unless-stopped
     command:
       - "--api.dashboard=true"
+      - "--api.insecure=true" # 8080 portundan şifresiz dashboard açar
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.file.directory=/etc/traefik/dynamic"
@@ -29,6 +30,11 @@
       - "--accesslog.bufferingsize=100"
       # Yerel Plugin Tanımı
       - "--experimental.localplugins.crowdsec.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      # Traefik Dashboard Router Tanımı:
+      - "traefik.http.routers.traefik-dash.rule=Host(`traefik.${DOMAIN_EXT}`)"
+      - "traefik.http.routers.traefik-dash.service=api@internal"
+      - "traefik.http.routers.traefik-dash.entrypoints=webexternal"
+      - "traefik.http.routers.traefik-dash.tls=true"
       # Let's Encrypt DNS Challenge (Cloudflare)
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/certs/acme.json"
