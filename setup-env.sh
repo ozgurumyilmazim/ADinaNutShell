@@ -311,8 +311,8 @@ echo -e "${GREEN}[✓] pgAdmin pgpass ve CrowdSec PostgreSQL ayarları hazırlan
 rm -f pgadmin/config_local.py
 # pgAdmin Desktop Mode ve Master Password Kapatma Yapılandırması
 cat <<'EOF' > pgadmin/config_local.py
-SERVER_MODE = False
-MASTER_PASSWORD_REQUIRED = False
+SERVER_MODE = True
+MASTER_PASSWORD_REQUIRED = True
 EOF
 
 chmod 644 pgadmin/config_local.py
