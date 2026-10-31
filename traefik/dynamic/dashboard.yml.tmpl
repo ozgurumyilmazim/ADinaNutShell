@@ -1,0 +1,17 @@
+http:
+  routers:
+    # Dahili Ağ Dashboard Erişimi (websecure - 443)
+    traefik-dash-int:
+      rule: "Host(`traefik.${DOMAIN_INT}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      entryPoints:
+        - "websecure"
+      service: "api@internal"
+      tls: {}
+
+    # Harici Ağ Dashboard Erişimi (webexternal - 444 / Cloudflare)
+    traefik-dash-ext:
+      rule: "Host(`traefik.${DOMAIN_EXT}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      entryPoints:
+        - "webexternal"
+      service: "api@internal"
+      tls: {}

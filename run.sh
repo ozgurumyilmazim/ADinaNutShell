@@ -21,6 +21,11 @@ echo -e "\n${YELLOW}[ADIM 1/4] Ortam değişkenleri ve yapılandırma dosyaları
 chmod +x ./setup-env.sh
 ./setup-env.sh
 
+# .env değişkenlerini yükle ve dashboard.yml dosyasını üret
+set -a
+source .env
+set +a
+
 # 2. Veritabanını ve Şemaları Ayağa Kaldır
 if [ ! -f ./setup-db.sh ]; then
     echo -e "${RED}[X] ./setup-db.sh betiği bulunamadı!${NC}"
@@ -38,6 +43,12 @@ docker compose up -d
 echo -e "\n${YELLOW}[ADIM 4/4] Zitadel alan adı entegrasyonu tamamlanıyor...${NC}"
 chmod +x ./setup-zitadel.sh
 ./setup-zitadel.sh
+
+DYNAMIC_DIR="./config/traefik/dynamic"
+if [ -f "$DYNAMIC_DIR/dashboard.yml.tmpl" ]; then
+    envsubst '${DOMAIN_EXT} ${DOMAIN_INT}' < "$DYNAMIC_DIR/dashboard.yml.tmpl" > "$DYNAMIC_DIR/dashboard.yml"
+fi
+
 
 echo -e "\n${GREEN}[✓] Tüm servisler ve alan adları başarıyla devreye alındı.${NC}\n"
 docker compose ps
