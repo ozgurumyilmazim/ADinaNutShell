@@ -41,6 +41,13 @@
       - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
       - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
+    labels:
+      - "traefik.enable=true"
+      # Dashboard Router (Hem /api hem /dashboard yollarını ve iki portu da kapsar):
+      - "traefik.http.routers.traefik-dash.rule=Host(`traefik.${DOMAIN_EXT}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.traefik-dash.entrypoints=webexternal"
+      - "traefik.http.routers.traefik-dash.service=api@internal"
+      - "traefik.http.routers.traefik-dash.tls=true"
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
       - CROWDSEC_BOUNCER_API_KEY=${CROWDSEC_BOUNCER_API_KEY}
