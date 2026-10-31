@@ -44,10 +44,15 @@
     labels:
       - "traefik.enable=true"
       # Dashboard Router (Hem /api hem /dashboard yollarını ve iki portu da kapsar):
-      - "traefik.http.routers.traefik-dash.rule=Host(`traefik.${DOMAIN_EXT}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
-      - "traefik.http.routers.traefik-dash.entrypoints=webexternal"
-      - "traefik.http.routers.traefik-dash.service=api@internal"
-      - "traefik.http.routers.traefik-dash.tls=true"
+      - "traefik.http.routers.traefik-ext-dash.rule=Host(`traefik.${DOMAIN_EXT}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.traefik-ext-dash.entrypoints=webexternal"
+      - "traefik.http.routers.traefik-ext-dash.service=api@internal"
+      - "traefik.http.routers.traefik-ext-dash.tls=true"
+      # Dashboard Router (Hem /api hem /dashboard yollarını ve iki portu da kapsar):
+      - "traefik.http.routers.traefik-int-dash.rule=Host(`traefik.${DOMAIN_INT}`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.traefik-int-dash.entrypoints=websecure"
+      - "traefik.http.routers.traefik-int-dash.service=api@internal"
+      - "traefik.http.routers.traefik-int-dash.tls=true"
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
       - CROWDSEC_BOUNCER_API_KEY=${CROWDSEC_BOUNCER_API_KEY}
