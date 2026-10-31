@@ -162,6 +162,13 @@
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
       OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
       OAUTH2_PROXY_COOKIE_SECURE: "true"
+      # --- EKLENEN KRİTİK AYARLAR ---
+      # 1. Oturum açıldığında Traefik'e 202 kabul yanıtı ver:
+      OAUTH2_PROXY_UPSTREAMS: "static://202"
+      # 2. Ara onay butonunu atlayıp doğrudan Zitadel girişine yönlendir:
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      # 3. İsteğin hangi alt alandan (portainer vb.) geldiğine bakılmaksızın callback'i sabit tut:
+      OAUTH2_PROXY_REDIRECT_URL: "https://auth-proxy.${DOMAIN_EXT}/oauth2/callback"
     networks:
       - edge_network
     labels:
