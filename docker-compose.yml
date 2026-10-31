@@ -8,7 +8,7 @@
     restart: unless-stopped
     command:
       - "--api.dashboard=true"
-      - "--api.insecure=true" # 8080 portundan şifresiz dashboard açar
+      - "--api.insecure=false" # 8080 portundan şifresiz dashboard açar
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.file.directory=/etc/traefik/dynamic"
