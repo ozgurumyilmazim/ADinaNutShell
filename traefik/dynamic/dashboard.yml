@@ -24,7 +24,7 @@ http:
   routers:
     # --- A) DAHİLİ ERİŞİM (.intra -> Port 443: Tam Yetkili) ---
     traefik-dashboard-int:
-      rule: "Host(`traefik.sirket.intra`)"
+      rule: "Host(`traefik.${DOMAIN_INT}`)"
       entryPoints:
         - "websecure"
       tls: {}
@@ -35,7 +35,7 @@ http:
     # --- B) HARİCİ BLOKLAMA KURALI (Yüksek Öncelik: Priority 100) ---
     # /api/rawdata, kök /api veya doğrudan durum listelemelerini dış ağda engeller
     traefik-api-ext-block:
-      rule: "Host(`traefik.sirket.com.tr`) && (PathPrefix(`/api/rawdata`) || Path(`/api`))"
+      rule: "Host(`traefik.${DOMAIN_EXT}`) && (PathPrefix(`/api/rawdata`) || Path(`/api`))"
       entryPoints:
         - "webexternal"
       priority: 100
@@ -46,7 +46,7 @@ http:
 
     # --- C) HARİCİ ARAYÜZ ERİŞİMİ (.com.tr -> Port 444: Sadece Dashboard UI) ---
     traefik-dashboard-ext:
-      rule: "Host(`traefik.sirket.com.tr`)"
+      rule: "Host(`traefik.${DOMAIN_EXT}`)"
       entryPoints:
         - "webexternal"
       priority: 10
